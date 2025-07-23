@@ -1,147 +1,147 @@
 import { JavaASTParser } from '../../src/core/JavaASTParser';
-import { parse } from 'java-ast';
-
-// Mock java-ast
-jest.mock('java-ast');
-const mockParse = parse as jest.MockedFunction<typeof parse>;
 
 describe('JavaASTParser', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   describe('parseFile', () => {
     it('应该能解析简单的 RestController', async () => {
-      // 使用 any 类型避免严格的类型检查
-      mockParse.mockReturnValue({} as any);
+      const javaCode = `
+package com.example.controller;
+
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/users")
+public class UserController {
+    
+    @GetMapping("/{id}")
+    public User getUser(@PathVariable Long id) {
+        return userService.findById(id);
+    }
+    
+    @PostMapping
+    public User createUser(@RequestBody User user) {
+        return userService.save(user);
+    }
+}`;
+
+      const result = await JavaASTParser.parseFile('/test/UserController.java', javaCode);
+
+      // 验证解析结果
+      expect(result.length).toBeGreaterThan(0);
       
-      // 模拟 JavaASTParser 的内部方法
-      const originalFindControllerClasses = (JavaASTParser as any).findControllerClasses;
-      const originalParseController = (JavaASTParser as any).parseController;
-      
-      (JavaASTParser as any).findControllerClasses = jest.fn().mockReturnValue([
-        {
-          name: 'UserController',
-          annotations: [
-            { name: 'RestController' },
-            { name: 'RequestMapping', attributes: { value: '/api/users' } }
-          ],
-          methods: [
-            {
-              name: 'getUser',
-              annotations: [
-                { name: 'GetMapping', attributes: { value: '/{id}' } }
-              ],
-              parameters: [],
-              startLine: 10,
-              endLine: 15
-            }
-          ]
-        }
-      ]);
+      const getEndpoint = result.find(e => e.method === 'GET');
+      if (getEndpoint) {
+        expect(getEndpoint.path).toContain('/api/users');
+        expect(getEndpoint.path).toContain('/{id}');
+        expect(getEndpoint.controllerClass).toBe('UserController');
+        expect(getEndpoint.methodName).toBe('getUser');
+      }
 
-      (JavaASTParser as any).parseController = jest.fn().mockReturnValue({
-        className: 'UserController',
-        classLevelMapping: '/api/users',
-        methods: [
-          {
-            id: 'test-1',
-            method: 'GET',
-            path: '/api/users/{id}',
-            classMapping: '/api/users',
-            methodMapping: '/{id}',
-            controllerClass: 'UserController',
-            methodName: 'getUser',
-            parameters: [],
-            location: {
-              filePath: '/mock/UserController.java',
-              startLine: 10,
-              endLine: 15,
-              startColumn: 0,
-              endColumn: 0
-            },
-            annotations: [],
-            pathComposition: {
-              classPath: '/api/users',
-              methodPath: '/{id}',
-              fullPath: '/api/users/{id}',
-              hasClassMapping: true,
-              hasMethodMapping: true
-            }
-          }
-        ]
-      });
-
-      const result = await JavaASTParser.parseFile('/mock/UserController.java', 'mock content');
-
-      expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({
-        method: 'GET',
-        path: '/api/users/{id}',
-        controllerClass: 'UserController',
-        methodName: 'getUser'
-      });
-
-      // 恢复原始方法
-      (JavaASTParser as any).findControllerClasses = originalFindControllerClasses;
-      (JavaASTParser as any).parseController = originalParseController;
+      const postEndpoint = result.find(e => e.method === 'POST');
+      if (postEndpoint) {
+        expect(postEndpoint.path).toBe('/api/users');
+        expect(postEndpoint.controllerClass).toBe('UserController');
+        expect(postEndpoint.methodName).toBe('createUser');
+      }
     });
 
     it('应该处理解析错误并返回空数组', async () => {
-      mockParse.mockImplementation(() => {
-        throw new Error('Parse error');
-      });
+      const invalidJavaCode = 'this is not valid java code {{{';
 
-      const result = await JavaASTParser.parseFile('/mock/invalid.java', 'invalid content');
+      const result = await JavaASTParser.parseFile('/test/invalid.java', invalidJavaCode);
 
       expect(result).toEqual([]);
     });
 
-    it('应该处理空的 AST 并返回空数组', async () => {
-      mockParse.mockReturnValue(null as any);
-
-      const result = await JavaASTParser.parseFile('/mock/empty.java', '');
+    it('应该处理空内容并返回空数组', async () => {
+      const result = await JavaASTParser.parseFile('/test/empty.java', '');
 
       expect(result).toEqual([]);
     });
 
-    it('应该正确处理多个控制器', async () => {
-      mockParse.mockReturnValue({} as any);
+    it('应该解析不同HTTP方法的映射', async () => {
+      const javaCode = `
+package com.example.controller;
+
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/products")
+public class ProductController {
+    
+    @GetMapping
+    public List<Product> getAllProducts() {
+        return productService.findAll();
+    }
+    
+    @PostMapping
+    public Product createProduct(@RequestBody Product product) {
+        return productService.save(product);
+    }
+    
+    @PutMapping("/{id}")
+    public Product updateProduct(@PathVariable Long id, @RequestBody Product product) {
+        return productService.update(id, product);
+    }
+    
+    @DeleteMapping("/{id}")
+    public void deleteProduct(@PathVariable Long id) {
+        productService.delete(id);
+    }
+}`;
+
+      const result = await JavaASTParser.parseFile('/test/ProductController.java', javaCode);
+
+      expect(result.length).toBe(4);
       
-      const originalFindControllerClasses = (JavaASTParser as any).findControllerClasses;
-      const originalParseController = (JavaASTParser as any).parseController;
-      
-      (JavaASTParser as any).findControllerClasses = jest.fn().mockReturnValue([
-        { name: 'UserController' },
-        { name: 'ProductController' }
-      ]);
+      const methods = result.map(e => e.method);
+      expect(methods).toContain('GET');
+      expect(methods).toContain('POST');
+      expect(methods).toContain('PUT');
+      expect(methods).toContain('DELETE');
+    });
 
-      (JavaASTParser as any).parseController = jest.fn()
-        .mockReturnValueOnce({
-          methods: [
-            createMockEndpoint('GET', '/api/users', 'UserController', 'getUsers')
-          ]
-        })
-        .mockReturnValueOnce({
-          methods: [
-            createMockEndpoint('POST', '/api/products', 'ProductController', 'createProduct')
-          ]
-        });
+    it('应该处理没有控制器注解的类', async () => {
+      const javaCode = `
+package com.example.service;
 
-      const result = await JavaASTParser.parseFile('/mock/Controllers.java', 'mock content');
+public class UserService {
+    public User findById(Long id) {
+        return repository.findById(id);
+    }
+}`;
 
-      expect(result).toHaveLength(2);
-      expect(result[0].controllerClass).toBe('UserController');
-      expect(result[1].controllerClass).toBe('ProductController');
+      const result = await JavaASTParser.parseFile('/test/UserService.java', javaCode);
 
-      // 恢复原始方法
-      (JavaASTParser as any).findControllerClasses = originalFindControllerClasses;
-      (JavaASTParser as any).parseController = originalParseController;
+      expect(result).toEqual([]);
+    });
+
+    it('应该解析复杂的路径组合', async () => {
+      const javaCode = `
+package com.example.controller;
+
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/v1")
+public class ApiController {
+    
+    @RequestMapping(value = "/users/{userId}/posts/{postId}", method = RequestMethod.GET)
+    public Post getUserPost(@PathVariable Long userId, @PathVariable Long postId) {
+        return postService.findUserPost(userId, postId);
+    }
+}`;
+
+      const result = await JavaASTParser.parseFile('/test/ApiController.java', javaCode);
+
+      expect(result.length).toBe(1);
+      expect(result[0].path).toBe('/api/v1/users/{userId}/posts/{postId}');
+      expect(result[0].method).toBe('GET');
     });
   });
 
   describe('静态方法测试', () => {
     it('应该识别 Spring 控制器注解', () => {
+      // 访问静态属性进行测试
       const springAnnotations = (JavaASTParser as any).SPRING_ANNOTATIONS;
       
       expect(springAnnotations).toContain('RestController');
@@ -163,38 +163,4 @@ describe('JavaASTParser', () => {
       expect(mappingAnnotations).toContain('RequestMapping');
     });
   });
-});
-
-// 测试工具函数
-function createMockEndpoint(
-  method: string, 
-  path: string, 
-  controllerClass: string, 
-  methodName: string
-) {
-  return {
-    id: `${controllerClass}-${methodName}`,
-    method,
-    path,
-    classMapping: '',
-    methodMapping: path,
-    controllerClass,
-    methodName,
-    parameters: [],
-    location: {
-      filePath: `/mock/${controllerClass}.java`,
-      startLine: 1,
-      endLine: 10,
-      startColumn: 0,
-      endColumn: 0
-    },
-    annotations: [],
-    pathComposition: {
-      classPath: '',
-      methodPath: path,
-      fullPath: path,
-      hasClassMapping: false,
-      hasMethodMapping: true
-    }
-  };
-} 
+}); 

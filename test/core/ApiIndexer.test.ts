@@ -76,7 +76,11 @@ describe('ApiIndexer', () => {
     });
 
     it('应该处理没有工作区的情况', async () => {
-      mockVscode.workspace.workspaceFolders = [];
+      Object.defineProperty(mockVscode.workspace, 'workspaceFolders', {
+        value: [],
+        writable: true,
+        configurable: true
+      });
 
       await expect(apiIndexer.initialize()).resolves.not.toThrow();
       expect(mockWorkerPool.execute).not.toHaveBeenCalled();
@@ -133,7 +137,7 @@ describe('ApiIndexer', () => {
     });
 
     it('应该能按路径搜索端点', async () => {
-      const results = await apiIndexer.search('users');
+      const results = apiIndexer.searchEndpoints('users');
 
       expect(results).toHaveLength(2);
       expect(results[0].path).toContain('users');
@@ -141,7 +145,7 @@ describe('ApiIndexer', () => {
     });
 
     it('应该能按控制器类名搜索', async () => {
-      const results = await apiIndexer.search('UserController');
+      const results = apiIndexer.searchEndpoints('UserController');
 
       expect(results).toHaveLength(2);
       expect(results[0].controllerClass).toBe('UserController');
@@ -149,26 +153,26 @@ describe('ApiIndexer', () => {
     });
 
     it('应该能按 HTTP 方法过滤', async () => {
-      const results = await apiIndexer.search('POST');
+      const results = apiIndexer.searchEndpoints('POST');
 
       expect(results).toHaveLength(1);
       expect(results[0].method).toBe('POST');
     });
 
     it('应该处理空搜索查询', async () => {
-      const results = await apiIndexer.search('');
+      const results = apiIndexer.searchEndpoints('');
 
       expect(results).toHaveLength(3); // 返回所有端点
     });
 
     it('应该处理没有匹配结果的搜索', async () => {
-      const results = await apiIndexer.search('nonexistent');
+      const results = apiIndexer.searchEndpoints('nonexistent');
 
       expect(results).toHaveLength(0);
     });
 
     it('应该支持模糊搜索', async () => {
-      const results = await apiIndexer.search('prod');
+      const results = apiIndexer.searchEndpoints('prod');
 
       expect(results).toHaveLength(1);
       expect(results[0].path).toContain('products');
@@ -293,7 +297,7 @@ describe('ApiIndexer', () => {
     });
 
     it('应该返回指定控制器的端点', () => {
-      const userEndpoints = apiIndexer.getEndpointsByController('UserController');
+      const userEndpoints = apiIndexer.findByController('UserController');
 
       expect(userEndpoints).toHaveLength(2);
       userEndpoints.forEach(endpoint => {
@@ -302,7 +306,7 @@ describe('ApiIndexer', () => {
     });
 
     it('应该处理不存在的控制器', () => {
-      const endpoints = apiIndexer.getEndpointsByController('NonExistentController');
+      const endpoints = apiIndexer.findByController('NonExistentController');
 
       expect(endpoints).toHaveLength(0);
     });

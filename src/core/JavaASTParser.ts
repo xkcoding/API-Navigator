@@ -51,18 +51,19 @@ export class JavaASTParser {
         const controllers: ClassNode[] = [];
         
         this.traverseAST(ast, (node) => {
-            if (node.constructor.name === 'ClassDeclarationContext') {
-                // 获取类声明的父级TypeDeclarationContext来找到注解
-                const typeDeclaration = this.findParentTypeDeclaration(node, ast);
-                if (typeDeclaration) {
-                    const annotations = this.extractClassAnnotations(typeDeclaration);
-                    const hasControllerAnnotation = annotations.some(ann => 
-                        ann.name === 'RestController' || ann.name === 'Controller'
-                    );
+            if (node.constructor.name === 'TypeDeclarationContext') {
+                // 在TypeDeclarationContext中查找注解和类声明
+                const annotations = this.extractClassAnnotations(node);
+                const hasControllerAnnotation = annotations.some(ann => 
+                    ann.name === 'RestController' || ann.name === 'Controller'
+                );
 
-                    if (hasControllerAnnotation) {
-                        const className = this.extractClassName(node);
-                        const methods = this.extractMethodsFromClass(node);
+                if (hasControllerAnnotation) {
+                    // 查找嵌套的ClassDeclarationContext
+                    const classDeclaration = this.findChildByType(node, 'ClassDeclarationContext');
+                    if (classDeclaration) {
+                        const className = this.extractClassName(classDeclaration);
+                        const methods = this.extractMethodsFromClass(classDeclaration);
                         
                         controllers.push({
                             name: className,
@@ -78,19 +79,17 @@ export class JavaASTParser {
     }
 
     /**
-     * 查找ClassDeclarationContext的父级TypeDeclarationContext
+     * 在节点的直接子节点中查找指定类型
      */
-    private static findParentTypeDeclaration(classNode: any, rootNode: any): any {
-        let found = null;
+    private static findChildByType(node: any, typeName: string): any {
+        if (!node.children) return null;
         
-        this.traverseAST(rootNode, (node) => {
-            if (node.constructor.name === 'TypeDeclarationContext' && 
-                node.children && node.children.some((child: any) => child === classNode)) {
-                found = node;
+        for (const child of node.children) {
+            if (child && child.constructor.name === typeName) {
+                return child;
             }
-        });
-        
-        return found;
+        }
+        return null;
     }
 
     /**
@@ -247,34 +246,37 @@ export class JavaASTParser {
 
 
     /**
-     * 提取方法注解
+     * 提取方法注解 - 改进版本，在ClassBodyDeclarationContext中查找
      */
     private static extractMethodAnnotations(methodNode: any): Annotation[] {
         const annotations: Annotation[] = [];
         
-        // 使用_parent属性向上查找ClassBodyDeclarationContext
-        if ((methodNode as any)._parent) {
-            const parent = (methodNode as any)._parent;
-            
-            // 路径: MethodDeclarationContext → MemberDeclarationContext → ClassBodyDeclarationContext
-            if (parent._parent && parent._parent.constructor.name === 'ClassBodyDeclarationContext') {
-                const bodyDecl = parent._parent;
-                
-                // 查找ModifierContext
-                if (bodyDecl.children) {
-                    for (const child of bodyDecl.children) {
-                        if (child.constructor.name === 'ModifierContext') {
-                            // 在ModifierContext中查找注解
-                            this.traverseAST(child, (node) => {
-                                if (node.constructor.name === 'AnnotationContext') {
-                                    const annotation = this.extractAnnotationFromContext(node);
-                                    if (annotation && this.SPRING_ANNOTATIONS.includes(annotation.name)) {
-                                        annotations.push(annotation);
-                                    }
-                                }
-                            });
+        // 方法1: 尝试从_parent查找ClassBodyDeclarationContext
+        let classBodyDecl = null;
+        
+        // 向上查找ClassBodyDeclarationContext
+        let current = methodNode._parent;
+        while (current && !classBodyDecl) {
+            if (current.constructor.name === 'ClassBodyDeclarationContext') {
+                classBodyDecl = current;
+                break;
+            }
+            current = current._parent;
+        }
+        
+        if (classBodyDecl && classBodyDecl.children) {
+            // 查找ModifierContext
+            for (const child of classBodyDecl.children) {
+                if (child.constructor.name === 'ModifierContext') {
+                    // 在ModifierContext中查找注解
+                    this.traverseAST(child, (node) => {
+                        if (node.constructor.name === 'AnnotationContext') {
+                            const annotation = this.extractAnnotationFromContext(node);
+                            if (annotation && this.SPRING_ANNOTATIONS.includes(annotation.name)) {
+                                annotations.push(annotation);
+                            }
                         }
-                    }
+                    });
                 }
             }
         }

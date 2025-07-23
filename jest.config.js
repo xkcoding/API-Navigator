@@ -14,8 +14,9 @@ module.exports = {
   },
   
   // 模块路径映射
-  moduleNameMapping: {
-    '^@/(.*)$': '<rootDir>/src/$1'
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+    'vscode': '<rootDir>/test/setup.ts'
   },
   
   // 覆盖率配置

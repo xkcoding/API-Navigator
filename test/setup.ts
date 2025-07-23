@@ -73,7 +73,7 @@ jest.mock('java-ast', () => ({
 }));
 
 // 全局测试工具函数
-global.createMockApiEndpoint = (overrides = {}) => ({
+(global as any).createMockApiEndpoint = (overrides = {}) => ({
   id: 'test-endpoint',
   method: 'GET',
   path: '/api/test',
@@ -103,4 +103,7 @@ global.createMockApiEndpoint = (overrides = {}) => ({
 // 清理函数
 afterEach(() => {
   jest.clearAllMocks();
-}); 
+});
+
+// 导出mockVscode供Jest模块映射使用
+module.exports = mockVscode;
