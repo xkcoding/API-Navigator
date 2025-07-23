@@ -271,18 +271,77 @@ export class JavaASTParser {
     }
 
     /**
+     * 提取AST节点的位置信息
+     */
+    private static extractNodeLocation(node: any): { startLine: number; endLine: number; startColumn: number; endColumn: number } {
+        let startLine = 1;
+        let endLine = 1;
+        let startColumn = 0;
+        let endColumn = 0;
+
+        try {
+            // 尝试从start token获取位置信息
+            if (node.start) {
+                startLine = node.start.line || 1;
+                startColumn = node.start.column || 0;
+            }
+            
+            // 尝试从stop token获取结束位置
+            if (node.stop) {
+                endLine = node.stop.line || startLine;
+                endColumn = node.stop.column || startColumn;
+            }
+            
+            // 如果没有stop信息，使用start信息
+            if (endLine === 1 && startLine > 1) {
+                endLine = startLine;
+            }
+            
+            // 备用方法：尝试从symbol获取
+            if (startLine === 1 && node.symbol) {
+                startLine = node.symbol.line || 1;
+                startColumn = node.symbol.column || 0;
+                endLine = startLine;
+                endColumn = startColumn;
+            }
+            
+            // 最后的备用：遍历子节点寻找位置信息
+            if (startLine === 1 && node.children && node.children.length > 0) {
+                for (const child of node.children) {
+                    const childLocation = this.extractNodeLocation(child);
+                    if (childLocation.startLine > 1) {
+                        startLine = childLocation.startLine;
+                        startColumn = childLocation.startColumn;
+                        endLine = childLocation.endLine;
+                        endColumn = childLocation.endColumn;
+                        break;
+                    }
+                }
+            }
+        } catch (error) {
+            // 出错时使用默认值
+            console.warn('提取节点位置信息时出错:', error);
+        }
+
+        return { startLine, endLine, startColumn, endColumn };
+    }
+
+    /**
      * 提取方法信息
      */
     private static extractMethodInfo(methodNode: any): MethodNode | null {
         const methodName = this.extractMethodName(methodNode);
         const annotations = this.extractMethodAnnotations(methodNode);
+        const location = this.extractNodeLocation(methodNode);
         
         return {
             name: methodName,
             annotations,
             parameters: [], // TODO: 实现参数提取
-            startLine: 0, // TODO: 实现行号提取
-            endLine: 0
+            startLine: location.startLine,
+            endLine: location.endLine,
+            startColumn: location.startColumn,
+            endColumn: location.endColumn
         };
     }
 
@@ -410,8 +469,8 @@ export class JavaASTParser {
                 filePath,
                 startLine: method.startLine,
                 endLine: method.endLine,
-                startColumn: 0,
-                endColumn: 0
+                startColumn: method.startColumn || 0,
+                endColumn: method.endColumn || 0
             },
             annotations: method.annotations,
             pathComposition: {

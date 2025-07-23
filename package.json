@@ -15,12 +15,20 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "views": {
-      "explorer": [
+    "viewsContainers": {
+      "activitybar": [
         {
           "id": "apiNavigator",
-          "name": "API Navigator",
-          "when": "workspaceHasJavaFiles"
+          "title": "API Navigator",
+          "icon": "$(symbol-interface)"
+        }
+      ]
+    },
+    "views": {
+      "apiNavigator": [
+        {
+          "id": "apiNavigatorView",
+          "name": "API Endpoints"
         }
       ]
     },

@@ -12,6 +12,9 @@ export class ApiIndexer {
     private fileWatcher?: vscode.FileSystemWatcher;
     private debounceMap = new Map<string, NodeJS.Timeout>();
 
+    private _onDidChange: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
+    public readonly onDidChange: vscode.Event<void> = this._onDidChange.event;
+
     constructor(private workerPool: WorkerPool) {}
 
     /**
@@ -28,6 +31,9 @@ export class ApiIndexer {
             this.setupFileWatcher();
             
             console.log(`API 索引器初始化完成，共找到 ${this.endpoints.size} 个端点`);
+            
+            // 触发初始化完成事件
+            this._onDidChange.fire();
         } catch (error) {
             console.error('API 索引器初始化失败:', error);
             throw error;
@@ -347,6 +353,11 @@ export class ApiIndexer {
         for (const endpoint of endpointsToRemove) {
             this.removeEndpoint(endpoint.id);
         }
+        
+        // 如果删除了端点，触发更新事件
+        if (endpointsToRemove.length > 0) {
+            this._onDidChange.fire();
+        }
     }
 
     /**
@@ -362,6 +373,9 @@ export class ApiIndexer {
 
         // 重新扫描
         await this.scanWorkspace();
+        
+        // 触发更新事件
+        this._onDidChange.fire();
     }
 
     /**

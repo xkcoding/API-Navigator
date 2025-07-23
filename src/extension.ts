@@ -7,6 +7,9 @@ import { SearchProvider } from './ui/SearchProvider';
 export async function activate(context: vscode.ExtensionContext) {
     console.log('API Navigator 插件正在激活...');
 
+    // 检测工作区是否包含Java文件
+    await checkAndSetJavaContext();
+
     // 初始化核心组件
     const workerPool = new WorkerPool(4);
     const apiIndexer = new ApiIndexer(workerPool);
@@ -14,7 +17,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const searchProvider = new SearchProvider(apiIndexer);
 
     // 注册侧边栏树视图
-    const treeView = vscode.window.createTreeView('apiNavigator', {
+    const treeView = vscode.window.createTreeView('apiNavigatorView', {
         treeDataProvider: apiNavigatorProvider,
         showCollapseAll: true
     });
@@ -55,16 +58,43 @@ export function deactivate() {
 
 async function goToLocation(location: any) {
     try {
+        console.log('跳转位置信息:', {
+            filePath: location.filePath,
+            startLine: location.startLine,
+            endLine: location.endLine,
+            startColumn: location.startColumn,
+            endColumn: location.endColumn
+        });
+        
         const document = await vscode.workspace.openTextDocument(location.filePath);
         const editor = await vscode.window.showTextDocument(document);
         
-        const position = new vscode.Position(location.startLine - 1, location.startColumn);
+        const position = new vscode.Position(location.startLine - 1, location.startColumn || 0);
         const range = new vscode.Range(position, position);
         
         editor.selection = new vscode.Selection(position, position);
         editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+        
+        console.log('跳转到位置:', { line: position.line + 1, character: position.character });
     } catch (error) {
         console.error('跳转到代码位置失败:', error);
         vscode.window.showErrorMessage(`无法跳转到代码位置: ${error}`);
+    }
+}
+
+async function checkAndSetJavaContext() {
+    try {
+        // 查找工作区中的Java文件
+        const javaFiles = await vscode.workspace.findFiles('**/*.java', '**/node_modules/**', 1);
+        const hasJavaFiles = javaFiles.length > 0;
+        
+        // 设置上下文，用于控制面板显示
+        await vscode.commands.executeCommand('setContext', 'workspaceHasJavaFiles', hasJavaFiles);
+        
+        console.log(`检测到Java文件: ${hasJavaFiles}, 文件数量: ${javaFiles.length}`);
+    } catch (error) {
+        console.error('检测Java文件失败:', error);
+        // 默认设置为true，确保面板显示
+        await vscode.commands.executeCommand('setContext', 'workspaceHasJavaFiles', true);
     }
 } 

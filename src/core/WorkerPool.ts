@@ -20,7 +20,7 @@ export class WorkerPool {
      * 初始化工作线程池
      */
     private initializeWorkers(): void {
-        const workerScript = path.join(__dirname, 'worker.js');
+        const workerScript = path.join(__dirname, '../workers/worker.js');
         
         for (let i = 0; i < this.poolSize; i++) {
             try {
@@ -75,7 +75,7 @@ export class WorkerPool {
 
         // 创建新的工作线程
         try {
-            const workerScript = path.join(__dirname, 'worker.js');
+            const workerScript = path.join(__dirname, '../workers/worker.js');
             const newWorker = new Worker(workerScript);
             this.setupWorkerListeners(newWorker);
             this.workers.push(newWorker);

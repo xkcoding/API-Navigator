@@ -71,4 +71,6 @@ export interface MethodNode {
     parameters: Parameter[];
     startLine: number;
     endLine: number;
+    startColumn?: number;
+    endColumn?: number;
 } 

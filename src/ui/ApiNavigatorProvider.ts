@@ -24,8 +24,10 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
      * 设置索引器监听器
      */
     private setupIndexerListeners(): void {
-        // 当索引器完成初始化或刷新时，刷新树视图
-        // 这里可以添加事件监听逻辑
+        // 监听索引器的变化事件，自动刷新树视图
+        this.apiIndexer.onDidChange(() => {
+            this.refresh();
+        });
     }
 
     /**
