@@ -1,0 +1,3 @@
+[submodule "RestfulHelper"]
+	path = RestfulHelper
+	url = git@github.com:Nayacco/RestfulHelper.git
