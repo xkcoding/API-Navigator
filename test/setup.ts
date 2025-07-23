@@ -67,10 +67,8 @@ jest.mock('fs', () => ({
   statSync: jest.fn()
 }));
 
-// 模拟 java-ast 库
-jest.mock('java-ast', () => ({
-  parse: jest.fn()
-}));
+// 注意：java-ast 库不需要Mock，让它使用真实的解析功能
+// 这样JavaASTParser就能正常工作了
 
 // 全局测试工具函数
 (global as any).createMockApiEndpoint = (overrides = {}) => ({

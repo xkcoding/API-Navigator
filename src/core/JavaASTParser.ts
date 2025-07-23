@@ -188,25 +188,68 @@ export class JavaASTParser {
     }
 
     /**
-     * 提取注解属性（如@RequestMapping("/api/users")中的"/api/users"）
+     * 提取注解属性（支持复杂格式如@RequestMapping(value = "...", method = ...)）
      */
     private static extractAnnotationAttributes(annotationNode: any): Record<string, any> | undefined {
         const attributes: Record<string, any> = {};
         
         if (!annotationNode.children) return undefined;
         
-        // 查找ElementValueContext
-        for (const child of annotationNode.children) {
-            if (child.constructor.name === 'ElementValueContext') {
-                const value = this.getNodeText(child);
-                // 去除引号
+        // 查找ElementValuePairsContext或ElementValueContext
+        this.traverseAST(annotationNode, (node) => {
+            if (node.constructor.name === 'ElementValuePairsContext') {
+                // 处理多个属性: value = "...", method = ...
+                this.parseElementValuePairs(node, attributes);
+            } else if (node.constructor.name === 'ElementValueContext') {
+                // 处理单个值: @RequestMapping("/api/users")
+                const value = this.getNodeText(node);
                 const cleanValue = value.replace(/['"]/g, '');
-                attributes.value = cleanValue;
-                break;
+                if (cleanValue && !cleanValue.includes('RequestMethod')) {
+                    attributes.value = cleanValue;
+                }
             }
-        }
+        });
         
         return Object.keys(attributes).length > 0 ? attributes : undefined;
+    }
+
+    /**
+     * 解析注解的多个属性对
+     */
+    private static parseElementValuePairs(pairsNode: any, attributes: Record<string, any>): void {
+        this.traverseAST(pairsNode, (node) => {
+            if (node.constructor.name === 'ElementValuePairContext') {
+                // 查找属性名和值
+                let propertyName = '';
+                let propertyValue = '';
+                
+                this.traverseAST(node, (subNode) => {
+                    if (subNode.constructor.name === 'TerminalNode' && subNode.symbol) {
+                        const text = subNode.symbol.text;
+                        if (text === 'value' || text === 'method' || text === 'path') {
+                            propertyName = text;
+                        }
+                    } else if (subNode.constructor.name === 'LiteralContext') {
+                        const literal = this.getNodeText(subNode);
+                        propertyValue = literal.replace(/['"]/g, '');
+                    }
+                });
+                
+                if (propertyName && propertyValue) {
+                    if (propertyName === 'value' || propertyName === 'path') {
+                        attributes.value = propertyValue;
+                    } else if (propertyName === 'method' && propertyValue.includes('GET')) {
+                        attributes.method = 'GET';
+                    } else if (propertyName === 'method' && propertyValue.includes('POST')) {
+                        attributes.method = 'POST';
+                    } else if (propertyName === 'method' && propertyValue.includes('PUT')) {
+                        attributes.method = 'PUT';
+                    } else if (propertyName === 'method' && propertyValue.includes('DELETE')) {
+                        attributes.method = 'DELETE';
+                    }
+                }
+            }
+        });
     }
 
     /**

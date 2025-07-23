@@ -25,6 +25,8 @@ public class UserController {
 
       const result = await JavaASTParser.parseFile('/test/UserController.java', javaCode);
 
+      // 移除了调试输出
+
       // 验证解析结果
       expect(result.length).toBeGreaterThan(0);
       
@@ -63,6 +65,7 @@ public class UserController {
 package com.example.controller;
 
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
 
 @RestController
 @RequestMapping("/api/products")
