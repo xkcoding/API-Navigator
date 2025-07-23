@@ -1,0 +1,86 @@
+{
+  "name": "api-navigator",
+  "displayName": "API Navigator",
+  "version": "1.0.0",
+  "description": "Navigate and manage REST APIs in Java SpringBoot projects",
+  "categories": ["Other"],
+  "keywords": ["java", "spring", "springboot", "api", "rest", "navigation"],
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "activationEvents": [
+    "onLanguage:java",
+    "onCommand:apiNavigator.refresh",
+    "onCommand:apiNavigator.search"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "apiNavigator",
+          "name": "API Navigator",
+          "when": "workspaceHasJavaFiles"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "apiNavigator.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "apiNavigator.search",
+        "title": "Search APIs",
+        "icon": "$(search)"
+      },
+      {
+        "command": "apiNavigator.openApi",
+        "title": "Open API"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "apiNavigator.search",
+        "key": "cmd+\\",
+        "mac": "cmd+\\",
+        "when": "workspaceHasJavaFiles"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "apiNavigator.refresh",
+          "when": "view == apiNavigator",
+          "group": "navigation"
+        },
+        {
+          "command": "apiNavigator.search",
+          "when": "view == apiNavigator",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.60.0",
+    "@types/node": "16.x",
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "java-ast": "^0.3.0"
+  },
+  "author": "xkcoding (Yangkai.Shen) <237497819@qq.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xkcoding/API-Navigator.git"
+  },
+  "publisher": "xkcoding"
+}
