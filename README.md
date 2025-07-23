@@ -46,6 +46,14 @@ API Navigator 是一个基于 VSCode/Cursor 的插件，旨在帮助开发者快
 
 ```
 API Navigator/
+├── .cursor/                     # Cursor 编辑器配置
+├── .git/                        # Git 仓库配置
+├── .gitignore                   # Git 忽略规则
+├── .gitmodules                  # Git 子模块配置
+├── .memory-bank/                # Memory Bank 系统配置文件
+├── .specstory/                  # 项目规格和开发历史记录
+├── LICENSE                      # MIT 开源许可证
+├── README.md                    # 项目说明文档
 ├── memory-bank/                 # Memory Bank 系统（开发过程管理）
 │   ├── tasks.md                 # 任务跟踪
 │   ├── activeContext.md         # 活跃上下文
@@ -53,15 +61,13 @@ API Navigator/
 │   │   └── creative-plugin-architecture.md
 │   ├── techContext.md           # 技术上下文
 │   ├── systemPatterns.md        # 系统模式
-│   └── ...
-├── RestfulHelper/               # 原始 IDEA 插件源码（参考）
+│   └── ...                      # 其他 Memory Bank 文档
+├── RestfulHelper/               # 原始 IDEA 插件源码（Git 子模块）
 │   └── src/main/kotlin/...
-├── api-navigator/               # 新 VSCode 插件项目（待创建）
-│   ├── src/
-│   ├── package.json
-│   └── ...
-├── .gitignore
-└── README.md
+└── api-navigator/               # 新 VSCode 插件项目（待创建）
+    ├── src/
+    ├── package.json
+    └── ...
 ```
 
 ## 🚀 开发状态
@@ -99,6 +105,63 @@ public class UserController {
     @PostMapping("/register")    // 组合后: POST /api/users/register  
     public User createUser(@RequestBody User user) {}
 }
+```
+
+## 🚀 快速开始
+
+### 克隆项目
+由于本项目使用了 Git 子模块，请使用以下命令完整克隆项目：
+
+```bash
+# 克隆项目和所有子模块
+git clone --recursive git@github.com:xkcoding/API-Navigator.git
+
+# 或者先克隆主项目，再初始化子模块
+git clone git@github.com:xkcoding/API-Navigator.git
+cd API-Navigator
+git submodule update --init --recursive
+```
+
+### AI 结对编程环境复刻 🤖
+
+本项目包含完整的 AI 开发工具配置，帮助您快速复刻相同的开发环境：
+
+#### **Cursor 编辑器配置**
+- **位置**: `.cursor/` 目录
+- **作用**: Cursor 编辑器的项目配置和偏好设置
+- **使用方法**: 用 Cursor 打开项目，配置将自动加载
+
+#### **Memory Bank 系统**
+- **位置**: `.memory-bank/` 目录（配置文件）+ `memory-bank/` 目录（工作文档）
+- **作用**: 结构化的项目开发过程管理系统
+- **功能**: 任务跟踪、架构设计、技术决策记录、开发历史
+- **使用方法**: 配合支持 Memory Bank 的 AI 助手使用
+
+#### **Spec Story 项目记录**
+- **位置**: `.specstory/` 目录
+- **作用**: 项目规格说明和开发历史追踪
+- **功能**: 记录需求变更、技术决策历程、开发里程碑
+
+#### 开始 AI 结对编程
+1. 使用 Cursor 编辑器打开项目
+2. AI 助手将自动识别 Memory Bank 系统
+3. 通过 Memory Bank 文档了解项目当前状态
+4. 继续开发或分析项目架构
+
+### 更新 RestfulHelper 子模块
+当需要同步上游 RestfulHelper 的最新功能时：
+
+```bash
+# 检查是否有更新
+cd RestfulHelper
+git fetch
+git log HEAD..origin/main --oneline
+
+# 更新到最新版本
+cd ..
+git submodule update --remote RestfulHelper
+git add RestfulHelper
+git commit -m "📦 更新 RestfulHelper 子模块到最新版本"
 ```
 
 ## 🤝 贡献

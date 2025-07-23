@@ -13,10 +13,12 @@ Thumbs.db
 *.swp
 *.swo
 *~
-.cursor/
 .history/
-.memory-bank/
-.specstory/
+
+# AI 开发工具配置 (保留以便复刻开发环境)
+# .cursor/       - Cursor 编辑器配置
+# .memory-bank/  - Memory Bank 系统配置  
+# .specstory/    - 项目规格和历史记录
 
 # Node.js (未来 VSCode 插件开发)
 node_modules/
