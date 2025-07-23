@@ -45,30 +45,261 @@ export class JavaASTParser {
     }
 
     /**
-     * 查找所有控制器类
+     * 查找所有控制器类 - 适配ANTLR Context结构
      */
     private static findControllerClasses(ast: any): ClassNode[] {
         const controllers: ClassNode[] = [];
         
-        // 遍历 AST 查找带有 @RestController 或 @Controller 注解的类
         this.traverseAST(ast, (node) => {
-            if (node.type === 'ClassDeclaration') {
-                const annotations = this.extractAnnotations(node);
-                const hasControllerAnnotation = annotations.some(ann => 
-                    ann.name === 'RestController' || ann.name === 'Controller'
-                );
+            if (node.constructor.name === 'ClassDeclarationContext') {
+                // 获取类声明的父级TypeDeclarationContext来找到注解
+                const typeDeclaration = this.findParentTypeDeclaration(node, ast);
+                if (typeDeclaration) {
+                    const annotations = this.extractClassAnnotations(typeDeclaration);
+                    const hasControllerAnnotation = annotations.some(ann => 
+                        ann.name === 'RestController' || ann.name === 'Controller'
+                    );
 
-                if (hasControllerAnnotation) {
-                    controllers.push({
-                        name: node.name?.name || 'UnknownController',
-                        annotations,
-                        methods: this.extractMethods(node)
-                    });
+                    if (hasControllerAnnotation) {
+                        const className = this.extractClassName(node);
+                        const methods = this.extractMethodsFromClass(node);
+                        
+                        controllers.push({
+                            name: className,
+                            annotations,
+                            methods
+                        });
+                    }
                 }
             }
         });
 
         return controllers;
+    }
+
+    /**
+     * 查找ClassDeclarationContext的父级TypeDeclarationContext
+     */
+    private static findParentTypeDeclaration(classNode: any, rootNode: any): any {
+        let found = null;
+        
+        this.traverseAST(rootNode, (node) => {
+            if (node.constructor.name === 'TypeDeclarationContext' && 
+                node.children && node.children.some((child: any) => child === classNode)) {
+                found = node;
+            }
+        });
+        
+        return found;
+    }
+
+    /**
+     * 提取类名
+     */
+    private static extractClassName(classNode: any): string {
+        // ClassDeclarationContext的第二个子节点通常是类名
+        if (classNode.children && classNode.children.length >= 2) {
+            const nameNode = classNode.children[1];
+            if (nameNode.symbol && nameNode.symbol.text) {
+                return nameNode.symbol.text;
+            } else if (nameNode.text) {
+                return nameNode.text;
+            }
+        }
+        return 'UnknownController';
+    }
+
+    /**
+     * 提取类级别注解
+     */
+    private static extractClassAnnotations(typeDeclarationNode: any): Annotation[] {
+        const annotations: Annotation[] = [];
+        
+        if (!typeDeclarationNode.children) return annotations;
+        
+        // 遍历TypeDeclaration的子节点，查找ClassOrInterfaceModifierContext
+        for (const child of typeDeclarationNode.children) {
+            if (child.constructor.name === 'ClassOrInterfaceModifierContext') {
+                const annotation = this.extractAnnotationFromModifier(child);
+                if (annotation && this.SPRING_ANNOTATIONS.includes(annotation.name)) {
+                    annotations.push(annotation);
+                }
+            }
+        }
+        
+        return annotations;
+    }
+
+    /**
+     * 从修饰符中提取注解
+     */
+    private static extractAnnotationFromModifier(modifierNode: any): Annotation | null {
+        if (!modifierNode.children || modifierNode.children.length === 0) return null;
+        
+        const firstChild = modifierNode.children[0];
+        if (firstChild.constructor.name === 'AnnotationContext') {
+            return this.extractAnnotationFromContext(firstChild);
+        }
+        
+        return null;
+    }
+
+    /**
+     * 从AnnotationContext提取注解信息
+     */
+    private static extractAnnotationFromContext(annotationNode: any): Annotation | null {
+        if (!annotationNode.children) return null;
+        
+        // AnnotationContext的第二个子节点通常是QualifiedNameContext
+        if (annotationNode.children.length >= 2) {
+            const nameNode = annotationNode.children[1];
+            if (nameNode.constructor.name === 'QualifiedNameContext') {
+                const name = this.getNodeText(nameNode);
+                const attributes = this.extractAnnotationAttributes(annotationNode);
+                return { name, attributes };
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * 统一获取节点文本的工具方法
+     */
+    private static getNodeText(node: any): string {
+        if (!node) return '';
+        
+        // 尝试不同方法获取文本
+        if (node.symbol && node.symbol.text) {
+            return node.symbol.text;
+        } else if (node.text) {
+            return node.text;
+        } else if (typeof node.getText === 'function') {
+            return node.getText();
+        } else if (node.toString) {
+            return node.toString();
+        }
+        
+        // 对于复合节点，递归获取所有子节点文本
+        if (node.children && Array.isArray(node.children)) {
+            return node.children.map((child: any) => this.getNodeText(child)).join('');
+        }
+        
+        return '';
+    }
+
+    /**
+     * 提取注解属性（如@RequestMapping("/api/users")中的"/api/users"）
+     */
+    private static extractAnnotationAttributes(annotationNode: any): Record<string, any> | undefined {
+        const attributes: Record<string, any> = {};
+        
+        if (!annotationNode.children) return undefined;
+        
+        // 查找ElementValueContext
+        for (const child of annotationNode.children) {
+            if (child.constructor.name === 'ElementValueContext') {
+                const value = this.getNodeText(child);
+                // 去除引号
+                const cleanValue = value.replace(/['"]/g, '');
+                attributes.value = cleanValue;
+                break;
+            }
+        }
+        
+        return Object.keys(attributes).length > 0 ? attributes : undefined;
+    }
+
+    /**
+     * 从类中提取方法
+     */
+    private static extractMethodsFromClass(classNode: any): MethodNode[] {
+        const methods: MethodNode[] = [];
+        
+        this.traverseAST(classNode, (node) => {
+            if (node.constructor.name === 'MethodDeclarationContext') {
+                const method = this.extractMethodInfo(node);
+                if (method && method.annotations.some(ann => this.MAPPING_ANNOTATIONS.includes(ann.name))) {
+                    methods.push(method);
+                }
+            }
+        });
+        
+        return methods;
+    }
+
+    /**
+     * 提取方法信息
+     */
+    private static extractMethodInfo(methodNode: any): MethodNode | null {
+        const methodName = this.extractMethodName(methodNode);
+        const annotations = this.extractMethodAnnotations(methodNode);
+        
+        return {
+            name: methodName,
+            annotations,
+            parameters: [], // TODO: 实现参数提取
+            startLine: 0, // TODO: 实现行号提取
+            endLine: 0
+        };
+    }
+
+
+
+    /**
+     * 提取方法注解
+     */
+    private static extractMethodAnnotations(methodNode: any): Annotation[] {
+        const annotations: Annotation[] = [];
+        
+        // 使用_parent属性向上查找ClassBodyDeclarationContext
+        if ((methodNode as any)._parent) {
+            const parent = (methodNode as any)._parent;
+            
+            // 路径: MethodDeclarationContext → MemberDeclarationContext → ClassBodyDeclarationContext
+            if (parent._parent && parent._parent.constructor.name === 'ClassBodyDeclarationContext') {
+                const bodyDecl = parent._parent;
+                
+                // 查找ModifierContext
+                if (bodyDecl.children) {
+                    for (const child of bodyDecl.children) {
+                        if (child.constructor.name === 'ModifierContext') {
+                            // 在ModifierContext中查找注解
+                            this.traverseAST(child, (node) => {
+                                if (node.constructor.name === 'AnnotationContext') {
+                                    const annotation = this.extractAnnotationFromContext(node);
+                                    if (annotation && this.SPRING_ANNOTATIONS.includes(annotation.name)) {
+                                        annotations.push(annotation);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        
+        return annotations;
+    }
+
+    /**
+     * 提取方法名
+     */
+    private static extractMethodName(methodNode: any): string {
+        // MethodDeclarationContext结构中查找方法名
+        if (methodNode.children) {
+            for (const child of methodNode.children) {
+                if (child.constructor.name === 'TerminalNode') {
+                    const text = this.getNodeText(child);
+                    if (text && 
+                        !['public', 'private', 'protected', 'static', 'void'].includes(text) &&
+                        /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(text)) {
+                        return text;
+                    }
+                }
+            }
+        }
+        return 'unknownMethod';
     }
 
     /**
@@ -100,46 +331,34 @@ export class JavaASTParser {
             ann => ann.name === 'RequestMapping'
         );
 
-        if (requestMappingAnnotation) {
-            return this.extractMappingValue(requestMappingAnnotation) || '';
+        if (requestMappingAnnotation?.attributes?.value) {
+            return this.cleanPath(requestMappingAnnotation.attributes.value);
         }
 
         return '';
     }
 
     /**
-     * 解析方法，提取 API 端点信息
+     * 解析单个方法，生成 API 端点
      */
-    private static parseMethod(
-        method: MethodNode, 
-        className: string, 
-        classMapping: string, 
-        filePath: string
-    ): ApiEndpoint | null {
-        const mappingAnnotation = this.findMappingAnnotation(method);
-        if (!mappingAnnotation) {
-            return null;
-        }
+    private static parseMethod(method: MethodNode, controllerClass: string, classLevelMapping: string, filePath: string): ApiEndpoint | null {
+        const mappingAnnotation = method.annotations.find(ann => 
+            this.MAPPING_ANNOTATIONS.includes(ann.name)
+        );
 
-        const methodMapping = this.extractMappingValue(mappingAnnotation) || '';
+        if (!mappingAnnotation) return null;
+
         const httpMethod = this.extractHttpMethod(mappingAnnotation);
-        const fullPath = this.composeUrl(classMapping, methodMapping);
-
-        const pathComposition: PathComposition = {
-            classPath: classMapping,
-            methodPath: methodMapping,
-            fullPath,
-            hasClassMapping: !!classMapping,
-            hasMethodMapping: !!methodMapping
-        };
+        const methodMapping = this.extractMethodMapping(mappingAnnotation);
+        const fullPath = this.composeUrl(classLevelMapping, methodMapping);
 
         return {
-            id: `${className}_${method.name}_${Date.now()}`,
+            id: `${controllerClass}-${method.name}-${Date.now()}`,
             method: httpMethod,
             path: fullPath,
-            classMapping,
+            classMapping: classLevelMapping,
             methodMapping,
-            controllerClass: className,
+            controllerClass,
             methodName: method.name,
             parameters: method.parameters,
             location: {
@@ -150,38 +369,24 @@ export class JavaASTParser {
                 endColumn: 0
             },
             annotations: method.annotations,
-            pathComposition
+            pathComposition: {
+                classPath: classLevelMapping,
+                methodPath: methodMapping,
+                fullPath,
+                hasClassMapping: !!classLevelMapping,
+                hasMethodMapping: !!methodMapping
+            }
         };
     }
 
     /**
-     * 查找方法上的映射注解
+     * 提取方法级别的路径映射
      */
-    private static findMappingAnnotation(method: MethodNode): Annotation | null {
-        return method.annotations.find(ann => 
-            this.MAPPING_ANNOTATIONS.includes(ann.name)
-        ) || null;
-    }
-
-    /**
-     * 提取注解的映射值 (value 或 path 属性)
-     */
-    private static extractMappingValue(annotation: Annotation): string | null {
-        if (!annotation.attributes) {
-            return null;
+    private static extractMethodMapping(annotation: Annotation): string {
+        if (annotation.attributes?.value) {
+            return this.cleanPath(annotation.attributes.value);
         }
-
-        // 优先查找 value 属性，然后是 path 属性
-        const value = annotation.attributes.value || annotation.attributes.path;
-        if (typeof value === 'string') {
-            return value.replace(/['"]/g, ''); // 去除引号
-        }
-
-        if (Array.isArray(value) && value.length > 0) {
-            return String(value[0]).replace(/['"]/g, '');
-        }
-
-        return null;
+        return '';
     }
 
     /**
@@ -189,33 +394,22 @@ export class JavaASTParser {
      */
     private static extractHttpMethod(annotation: Annotation): HttpMethod {
         switch (annotation.name) {
-            case 'GetMapping': return 'GET';
-            case 'PostMapping': return 'POST';
-            case 'PutMapping': return 'PUT';
-            case 'DeleteMapping': return 'DELETE';
-            case 'PatchMapping': return 'PATCH';
+            case 'GetMapping':
+                return 'GET';
+            case 'PostMapping':
+                return 'POST';
+            case 'PutMapping':
+                return 'PUT';
+            case 'DeleteMapping':
+                return 'DELETE';
+            case 'PatchMapping':
+                return 'PATCH';
             case 'RequestMapping':
-                // 从 method 属性中提取
-                const methodValue = annotation.attributes?.method;
-                if (methodValue) {
-                    return this.parseRequestMethod(methodValue);
-                }
+                // TODO: 处理method属性
                 return 'GET'; // 默认值
             default:
                 return 'GET';
         }
-    }
-
-    /**
-     * 解析 RequestMethod 枚举值
-     */
-    private static parseRequestMethod(methodValue: string): HttpMethod {
-        // 处理 RequestMethod.GET 格式
-        if (methodValue.includes('RequestMethod.')) {
-            const method = methodValue.split('.')[1];
-            return method.toUpperCase() as HttpMethod;
-        }
-        return methodValue.toUpperCase() as HttpMethod;
     }
 
     /**
@@ -249,86 +443,15 @@ export class JavaASTParser {
     }
 
     /**
-     * 提取注解信息
-     */
-    private static extractAnnotations(node: any): Annotation[] {
-        if (!node.modifiers) return [];
-
-        const annotations: Annotation[] = [];
-        for (const modifier of node.modifiers) {
-            if (modifier.type === 'Annotation') {
-                const name = this.extractAnnotationName(modifier);
-                if (this.SPRING_ANNOTATIONS.includes(name)) {
-                    annotations.push({
-                        name,
-                        attributes: this.extractAnnotationAttributes(modifier)
-                    });
-                }
-            }
-        }
-        return annotations;
-    }
-
-    /**
-     * 提取注解名称
-     */
-    private static extractAnnotationName(annotation: any): string {
-        if (annotation.typeName?.name) {
-            return annotation.typeName.name;
-        }
-        return '';
-    }
-
-    /**
-     * 提取注解属性
-     */
-    private static extractAnnotationAttributes(annotation: any): Record<string, any> | undefined {
-        // 这里需要根据 java-ast 的具体结构来实现
-        // 暂时返回空对象
-        return {};
-    }
-
-    /**
-     * 提取方法信息
-     */
-    private static extractMethods(classNode: any): MethodNode[] {
-        const methods: MethodNode[] = [];
-        
-        if (classNode.bodyDeclarations) {
-            for (const member of classNode.bodyDeclarations) {
-                if (member.type === 'MethodDeclaration') {
-                    const annotations = this.extractAnnotations(member);
-                    if (annotations.some(ann => this.MAPPING_ANNOTATIONS.includes(ann.name))) {
-                        methods.push({
-                            name: member.name?.name || 'unknownMethod',
-                            annotations,
-                            parameters: [], // TODO: 提取参数信息
-                            startLine: member.range?.[0] || 0,
-                            endLine: member.range?.[1] || 0
-                        });
-                    }
-                }
-            }
-        }
-
-        return methods;
-    }
-
-    /**
-     * 遍历 AST 节点
+     * 遍历 AST 节点 - 适配ANTLR Context结构
      */
     private static traverseAST(node: any, visitor: (node: any) => void): void {
         if (!node || typeof node !== 'object') return;
 
         visitor(node);
 
-        for (const key in node) {
-            const child = node[key];
-            if (Array.isArray(child)) {
-                for (const item of child) {
-                    this.traverseAST(item, visitor);
-                }
-            } else if (typeof child === 'object') {
+        if (node.children && Array.isArray(node.children)) {
+            for (const child of node.children) {
                 this.traverseAST(child, visitor);
             }
         }
