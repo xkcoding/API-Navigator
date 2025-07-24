@@ -1,0 +1,80 @@
+# 源码文件 (因为只需要编译后的out目录)
+src/**
+tsconfig.json
+
+# 测试相关
+test/**
+jest.config.js
+coverage/**
+
+# 开发依赖 (保留运行时依赖)
+node_modules/@types/**
+node_modules/jest/**
+node_modules/ts-jest/**
+node_modules/typescript/**
+node_modules/.bin/**
+node_modules/.cache/**
+package-lock.json
+yarn.lock
+
+# 注意：保留运行时依赖
+# node_modules/ignore/     - 运行时需要
+# node_modules/java-ast/   - 运行时需要
+
+# 开发工具和配置
+.vscode/**
+.cursor/**
+.history/**
+.specstory/**
+.memory-bank/**
+
+# 系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 临时文件
+temp/**
+tmp/**
+.tmp/**
+*.tmp
+*.swp
+*.swo
+*~
+
+# 日志文件
+logs/**
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Git 相关
+.git/**
+.gitignore
+.gitmodules
+
+# 构建和打包产物 (避免递归包含)
+*.vsix
+*.tgz
+build/**
+
+# 环境变量文件
+.env*
+
+# 文档 (可选，如果你想在插件中包含README可以移除这行)
+# README.md
+# LICENSE
+
+# RestfulHelper子项目 (如果不需要在插件中包含)
+RestfulHelper/**
+
+# 验证指南等开发文档
+local-verification-guide.md
+
+# IDE 配置
+.idea/**
