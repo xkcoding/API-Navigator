@@ -27,7 +27,7 @@ yarn-debug.log*
 yarn-error.log*
 .npm
 .yarn-integrity
-package-lock.json
+# package-lock.json  # 保留以确保CI/CD依赖一致性
 yarn.lock
 
 # 构建产物
