@@ -7,6 +7,9 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 允许上传文件到 Release
+      actions: read    # 允许读取 Actions 信息
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,25 +29,18 @@ jobs:
         run: npm run vscode:prepublish
       
       - name: Package extension
-        run: npx vsce package
+        id: package
+        run: |
+          PACKAGE_NAME=$(npx vsce package --out xkcoding-api-navigator.vsix | grep "Packaged:" | awk '{print $2}' || echo "xkcoding-api-navigator.vsix")
+          echo "package_name=xkcoding-api-navigator.vsix" >> $GITHUB_OUTPUT
       
       - name: Publish to VSCode Marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx vsce publish
-      
-      - name: Get package name
-        id: package
-        run: |
-          PACKAGE_NAME=$(ls *.vsix | head -1)
-          echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+        run: npx vsce publish --packagePath xkcoding-api-navigator.vsix
       
       - name: Upload VSIX to release
-        uses: actions/upload-release-asset@v1
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} "xkcoding-api-navigator.vsix" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./${{ steps.package.outputs.package_name }}
-          asset_name: ${{ steps.package.outputs.package_name }}
-          asset_content_type: application/zip
