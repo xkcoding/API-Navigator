@@ -20,7 +20,20 @@ export class WorkerPool {
      * 初始化工作线程池
      */
     private initializeWorkers(): void {
-        const workerScript = path.join(__dirname, '../workers/worker.js');
+        // 修复路径解析问题：根据当前运行环境确定正确的worker.js路径
+        let workerScript: string;
+        
+        // 检查是否在out目录中运行（生产环境）
+        if (__dirname.includes('out')) {
+            // 在编译后的out目录中运行
+            workerScript = path.join(__dirname, '../workers/worker.js');
+        } else {
+            // 在src目录中运行（开发/测试环境），需要指向编译后的文件
+            const rootDir = path.resolve(__dirname, '../../');
+            workerScript = path.join(rootDir, 'out/workers/worker.js');
+        }
+        
+        console.log(`使用工作线程脚本: ${workerScript}`);
         
         for (let i = 0; i < this.poolSize; i++) {
             try {
@@ -73,16 +86,29 @@ export class WorkerPool {
             this.availableWorkers.splice(availableIndex, 1);
         }
 
-        // 创建新的工作线程
         try {
-            const workerScript = path.join(__dirname, '../workers/worker.js');
+            // 创建新的工作线程，使用相同的路径解析逻辑
+            let workerScript: string;
+            
+            if (__dirname.includes('out')) {
+                workerScript = path.join(__dirname, '../workers/worker.js');
+            } else {
+                const rootDir = path.resolve(__dirname, '../../');
+                workerScript = path.join(rootDir, 'out/workers/worker.js');
+            }
+            
             const newWorker = new Worker(workerScript);
             this.setupWorkerListeners(newWorker);
             this.workers.push(newWorker);
             this.availableWorkers.push(newWorker);
+            
+            console.log('工作线程替换成功');
         } catch (error) {
             console.error('替换工作线程失败:', error);
         }
+
+        // 终止旧的工作线程
+        oldWorker.terminate();
     }
 
     /**

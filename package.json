@@ -3,8 +3,17 @@
   "displayName": "API Navigator",
   "version": "1.0.0",
   "description": "Navigate and manage REST APIs in Java SpringBoot projects",
-  "categories": ["Other"],
-  "keywords": ["java", "spring", "springboot", "api", "rest", "navigation"],
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "java",
+    "spring",
+    "springboot",
+    "api",
+    "rest",
+    "navigation"
+  ],
   "engines": {
     "vscode": "^1.60.0"
   },
@@ -105,14 +114,15 @@
     "test:ci": "jest --ci --coverage --watchAll=false"
   },
   "devDependencies": {
-    "@types/vscode": "^1.60.0",
-    "@types/node": "16.x",
     "@types/jest": "^29.5.0",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.60.0",
     "jest": "^29.5.0",
     "ts-jest": "^29.1.0",
     "typescript": "^4.9.4"
   },
   "dependencies": {
+    "ignore": "^7.0.5",
     "java-ast": "^0.3.0"
   },
   "author": "xkcoding (Yangkai.Shen) <237497819@qq.com>",

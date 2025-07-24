@@ -1,3 +1,4 @@
+import '../setup';  // 使用全局setup配置
 import { ApiIndexer } from '../../src/core/ApiIndexer';
 import { WorkerPool } from '../../src/core/WorkerPool';
 import * as vscode from 'vscode';
@@ -6,24 +7,8 @@ import * as fs from 'fs';
 // Mock 依赖
 jest.mock('../../src/core/WorkerPool');
 jest.mock('fs');
-jest.mock('vscode', () => ({
-  workspace: {
-    workspaceFolders: [
-      {
-        uri: { fsPath: '/mock/workspace' },
-        name: 'test-workspace'
-      }
-    ]
-  },
-  RelativePattern: jest.fn(),
-  FileSystemWatcher: jest.fn(),
-  window: {
-    setStatusBarMessage: jest.fn()
-  }
-}));
 
 const mockFs = fs as jest.Mocked<typeof fs>;
-const mockVscode = vscode as jest.Mocked<typeof vscode>;
 
 describe('ApiIndexer', () => {
   let apiIndexer: ApiIndexer;
@@ -67,16 +52,16 @@ describe('ApiIndexer', () => {
         onDidChange: jest.fn(),
         onDidDelete: jest.fn()
       };
-      mockVscode.workspace.createFileSystemWatcher = jest.fn().mockReturnValue(mockWatcher);
+      vscode.workspace.createFileSystemWatcher = jest.fn().mockReturnValue(mockWatcher);
 
       await apiIndexer.initialize();
 
       expect(mockWorkerPool.execute).toHaveBeenCalled();
-      expect(mockVscode.workspace.createFileSystemWatcher).toHaveBeenCalled();
+      expect(vscode.workspace.createFileSystemWatcher).toHaveBeenCalled();
     });
 
     it('应该处理没有工作区的情况', async () => {
-      Object.defineProperty(mockVscode.workspace, 'workspaceFolders', {
+      Object.defineProperty(vscode.workspace, 'workspaceFolders', {
         value: [],
         writable: true,
         configurable: true

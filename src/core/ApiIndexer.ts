@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import ignore from 'ignore';
 import { ApiEndpoint, HttpMethod } from './types';
 import { WorkerPool } from './WorkerPool';
 import { JavaASTParser } from './JavaASTParser';
@@ -11,6 +12,7 @@ export class ApiIndexer {
     private classIndex: Map<string, Set<string>> = new Map();
     private fileWatcher?: vscode.FileSystemWatcher;
     private debounceMap = new Map<string, NodeJS.Timeout>();
+    private ignoreInstance?: ReturnType<typeof ignore>;
 
     private _onDidChange: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
     public readonly onDidChange: vscode.Event<void> = this._onDidChange.event;
@@ -24,6 +26,9 @@ export class ApiIndexer {
         console.log('正在初始化 API 索引器...');
 
         try {
+            // 初始化 gitignore 规则
+            await this.initializeIgnoreRules();
+            
             // 扫描工作区中的 Java 文件
             await this.scanWorkspace();
             
@@ -38,6 +43,123 @@ export class ApiIndexer {
             console.error('API 索引器初始化失败:', error);
             throw error;
         }
+    }
+
+    /**
+     * 初始化 gitignore 规则
+     */
+    private async initializeIgnoreRules(): Promise<void> {
+        this.ignoreInstance = ignore();
+        
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            console.log('未找到工作区，使用默认忽略规则');
+            this.setupDefaultIgnoreRules();
+            return;
+        }
+
+        try {
+            // 查找所有 .gitignore 文件
+            const gitignoreFiles = await vscode.workspace.findFiles('**/.gitignore', null, 10);
+            
+            if (gitignoreFiles.length === 0) {
+                console.log('未找到 .gitignore 文件，使用默认忽略规则');
+                this.setupDefaultIgnoreRules();
+                return;
+            }
+
+            console.log(`📝 找到 ${gitignoreFiles.length} 个 .gitignore 文件`);
+            
+            // 读取并合并所有 .gitignore 文件的规则
+            for (const gitignoreFile of gitignoreFiles) {
+                try {
+                    const content = fs.readFileSync(gitignoreFile.fsPath, 'utf-8');
+                    this.ignoreInstance.add(content);
+                    console.log(`✅ 加载 .gitignore: ${gitignoreFile.fsPath}`);
+                } catch (error) {
+                    console.warn(`⚠️ 读取 .gitignore 失败: ${gitignoreFile.fsPath}`, error);
+                }
+            }
+            
+            // 添加额外的默认规则（确保基础隐藏目录被排除）
+            this.addDefaultIgnoreRules();
+            
+        } catch (error) {
+            console.error('初始化 gitignore 规则失败:', error);
+            this.setupDefaultIgnoreRules();
+        }
+    }
+
+    /**
+     * 设置默认忽略规则（当没有.gitignore时）
+     */
+    private setupDefaultIgnoreRules(): void {
+        const defaultRules = [
+            // 版本控制系统
+            '.git/',
+            '.svn/',
+            '.hg/',
+            
+            // IDE和编辑器
+            '.vscode/',
+            '.idea/',
+            '.eclipse/',
+            '.cursor/',
+            '.history/',
+            '.specstory/',
+            
+            // 系统文件
+            '.DS_Store',
+            'Thumbs.db',
+            
+            // 构建输出
+            'target/',
+            'build/',
+            'out/',
+            'dist/',
+            'bin/',
+            'classes/',
+            
+            // 依赖
+            'node_modules/',
+            '.npm/',
+            '.yarn/',
+            
+            // 日志和临时文件
+            'logs/',
+            'temp/',
+            'tmp/',
+            '*.log',
+            '*.tmp',
+            
+            // Java 特定
+            '*.class',
+            '.gradle/',
+            '.mvn/',
+        ];
+        
+        this.ignoreInstance!.add(defaultRules);
+        console.log('✅ 应用默认忽略规则');
+    }
+
+    /**
+     * 添加额外的默认规则（补充.gitignore）
+     */
+    private addDefaultIgnoreRules(): void {
+        const additionalRules = [
+            // 确保常见隐藏目录被排除
+            '.history/',
+            '.cursor/',
+            '.specstory/',
+            
+            // 确保构建目录被排除
+            'out/',
+            'dist/',
+            'temp/',
+        ];
+        
+        this.ignoreInstance!.add(additionalRules);
+        console.log('✅ 添加补充忽略规则');
     }
 
     /**
@@ -92,60 +214,72 @@ export class ApiIndexer {
     }
 
     /**
-     * 查找 Java 文件
+     * 查找 Java 文件 - 使用基础排除 + gitignore验证
      */
     private async findJavaFiles(rootPath: string): Promise<string[]> {
         const javaFiles: string[] = [];
         
         try {
+            // 使用基础排除模式，主要依靠 gitignore 进行精确过滤
             const files = await vscode.workspace.findFiles(
                 new vscode.RelativePattern(rootPath, '**/*.java'),
-                new vscode.RelativePattern(rootPath, '{**/node_modules/**,**/target/**,**/build/**,**/.git/**,**/.*/**}')
+                new vscode.RelativePattern(rootPath, '{**/node_modules/**,**/target/**,**/build/**}')
             );
 
+            console.log(`🔍 findFiles发现 ${files.length} 个Java文件`);
+
+            const workspaceRoot = rootPath;
+            const filteredFiles: string[] = [];
+            
             for (const file of files) {
-                // 额外检查：确保文件路径中不包含隐藏文件夹
-                if (!this.shouldExcludeFile(file.fsPath)) {
-                    javaFiles.push(file.fsPath);
+                // 使用 gitignore 规则验证文件
+                if (!this.shouldExcludeFile(file.fsPath, workspaceRoot)) {
+                    filteredFiles.push(file.fsPath);
+                    console.log(`✅ 包含文件: ${file.fsPath}`);
+                } else {
+                    console.log(`🚫 gitignore过滤: ${file.fsPath}`);
                 }
             }
+
+            javaFiles.push(...filteredFiles);
         } catch (error) {
             console.error('查找 Java 文件失败:', error);
         }
 
+        console.log(`📊 最终包含 ${javaFiles.length} 个Java文件用于扫描`);
         return javaFiles;
     }
 
     /**
-     * 检查是否应该排除文件
+     * 检查是否应该排除文件 - 使用 gitignore 策略
      */
-    private shouldExcludeFile(filePath: string): boolean {
-        const excludePatterns = [
-            '/.history/',    // Cursor 历史文件夹
-            '/.vscode/',     // VSCode 配置文件夹
-            '/.idea/',       // IntelliJ IDEA 配置文件夹
-            '/.git/',        // Git 文件夹
-            '/node_modules/', // Node.js 依赖
-            '/target/',      // Maven 构建目录
-            '/build/',       // Gradle 构建目录
-        ];
-
-        // 检查路径中是否包含需要排除的模式
-        for (const pattern of excludePatterns) {
-            if (filePath.includes(pattern)) {
-                return true;
-            }
+    private shouldExcludeFile(filePath: string, workspaceRoot?: string): boolean {
+        if (!this.ignoreInstance) {
+            return false;
         }
 
-        // 检查是否有隐藏文件夹（以 .开头的文件夹）
-        const pathParts = filePath.split(path.sep);
-        for (const part of pathParts) {
-            if (part.startsWith('.') && part.length > 1) {
-                return true;
+        try {
+            // 计算相对于工作区根目录的路径
+            let relativePath = filePath;
+            if (workspaceRoot) {
+                relativePath = path.relative(workspaceRoot, filePath);
+                // 确保使用正斜杠（gitignore 标准）
+                relativePath = relativePath.replace(/\\/g, '/');
             }
-        }
 
-        return false;
+            // 使用 gitignore 规则检查
+            const shouldIgnore = this.ignoreInstance.ignores(relativePath);
+            
+            if (shouldIgnore) {
+                console.log(`🚫 gitignore规则排除: ${relativePath}`);
+            }
+            
+            return shouldIgnore;
+        } catch (error) {
+            console.error(`检查文件排除规则失败: ${filePath}`, error);
+            // 发生错误时，使用保守策略：不排除
+            return false;
+        }
     }
 
     /**
@@ -309,7 +443,7 @@ export class ApiIndexer {
     }
 
     /**
-     * 设置文件监控
+     * 设置文件监控 - 使用 gitignore 策略
      */
     private setupFileWatcher(): void {
         this.fileWatcher = vscode.workspace.createFileSystemWatcher(
@@ -319,15 +453,32 @@ export class ApiIndexer {
             false  // 不忽略删除
         );
 
+        // 获取工作区根目录
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
         this.fileWatcher.onDidCreate(uri => {
-            this.debouncedUpdate(uri.fsPath, 'create');
+            // 使用 gitignore 规则检查文件
+            if (!this.shouldExcludeFile(uri.fsPath, workspaceRoot)) {
+                console.log(`📁 检测到新Java文件: ${uri.fsPath}`);
+                this.debouncedUpdate(uri.fsPath, 'create');
+            } else {
+                console.log(`🚫 gitignore忽略新文件: ${uri.fsPath}`);
+            }
         });
 
         this.fileWatcher.onDidChange(uri => {
-            this.debouncedUpdate(uri.fsPath, 'change');
+            // 使用 gitignore 规则检查文件
+            if (!this.shouldExcludeFile(uri.fsPath, workspaceRoot)) {
+                console.log(`📝 检测到Java文件变更: ${uri.fsPath}`);
+                this.debouncedUpdate(uri.fsPath, 'change');
+            } else {
+                console.log(`🚫 gitignore忽略文件变更: ${uri.fsPath}`);
+            }
         });
 
         this.fileWatcher.onDidDelete(uri => {
+            // 删除操作总是处理，确保清理
+            console.log(`🗑️ 检测到Java文件删除: ${uri.fsPath}`);
             this.debouncedUpdate(uri.fsPath, 'delete');
         });
     }

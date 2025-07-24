@@ -40,9 +40,10 @@ const mockVscode = {
     Expanded: 2
   },
   ThemeIcon: jest.fn(),
-  EventEmitter: jest.fn(() => ({
+  EventEmitter: jest.fn().mockImplementation(() => ({
     fire: jest.fn(),
-    event: jest.fn()
+    event: jest.fn(),
+    dispose: jest.fn()
   })),
   Disposable: {
     from: jest.fn()
