@@ -3,6 +3,7 @@
   "displayName": "API Navigator",
   "version": "1.0.0",
   "description": "Navigate and manage REST APIs in Java SpringBoot projects",
+  "icon": "images/icon.png",
   "categories": [
     "Other"
   ],

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20]  # 只测试2个主要版本
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      # 质量检查 (Layer 1: 基础检查)
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: TypeScript compilation check
+        run: npm run compile
+        if: matrix.node-version == '20'  # 只在Node 20上运行一次
+      
+      # 测试 (Layer 2: 功能验证)
+      - name: Run tests with coverage
+        run: npm run test:ci
+      
+      # 构建验证 (Layer 3: 集成验证)
+      - name: Build extension
+        run: npm run vscode:prepublish
+        if: matrix.node-version == '20'  # 只在Node 20上构建一次
+      
+      # 简化的安全检查
+      - name: Security audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true  # 不阻塞，但会报告
+        if: matrix.node-version == '20'  # 只在Node 20上运行一次
