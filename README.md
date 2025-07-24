@@ -1,4 +1,15 @@
-# API Navigator
+# API Navigator for Spring Boot
+
+<div align="center">
+  <img src="images/icon@2x.png" alt="API Navigator Logo" width="128" height="128">
+  
+  [![CI](https://github.com/xkcoding/API-Navigator/actions/workflows/ci.yml/badge.svg)](https://github.com/xkcoding/API-Navigator/actions/workflows/ci.yml)
+  [![Release](https://github.com/xkcoding/API-Navigator/actions/workflows/release.yml/badge.svg)](https://github.com/xkcoding/API-Navigator/actions/workflows/release.yml)
+  [![VSCode Marketplace](https://img.shields.io/visual-studio-marketplace/v/xkcoding.xkcoding-api-navigator)](https://marketplace.visualstudio.com/items?itemName=xkcoding.xkcoding-api-navigator)
+  [![Downloads](https://img.shields.io/visual-studio-marketplace/d/xkcoding.xkcoding-api-navigator)](https://marketplace.visualstudio.com/items?itemName=xkcoding.xkcoding-api-navigator)
+  [![Rating](https://img.shields.io/visual-studio-marketplace/r/xkcoding.xkcoding-api-navigator)](https://marketplace.visualstudio.com/items?itemName=xkcoding.xkcoding-api-navigator)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+</div>
 
 一个强大的 VSCode 扩展，帮助 Java Spring Boot 开发者快速导航和管理 REST API 端点。
 
@@ -50,19 +61,29 @@ API Navigator 是从 IntelliJ IDEA 插件 RestfulHelper 移植而来的 VSCode �
 
 - VSCode 1.60.0+
 - Java 项目 (Spring Boot 推荐)
-- Node.js 16+ (开发环境)
 
 ### 安装插件
 
-1. 在 VSCode 扩展市场搜索 "API Navigator"
-2. 点击安装
-3. 重新加载 VSCode
+#### 方式 1: VSCode 扩展市场
+1. 在 VSCode 扩展市场搜索 "API Navigator for Spring Boot"
+2. 寻找我们的专用图标：<img src="images/icon.png" alt="Extension Icon" width="24" height="24" style="vertical-align: middle;"> 
+3. 点击安装
+4. 重新加载 VSCode
+
+#### 方式 2: 命令行安装
+```bash
+code --install-extension xkcoding.xkcoding-api-navigator
+```
+
+#### 方式 3: 手动安装
+1. 从 [GitHub Releases](https://github.com/xkcoding/API-Navigator/releases) 下载最新的 `.vsix` 文件
+2. 在 VSCode 中使用 `Extensions: Install from VSIX...` 命令安装
 
 ### 使用方法
 
 1. **打开 Java Spring Boot 项目**
 2. **查看侧边栏**: 在资源管理器中找到 "API Navigator" 面板
-3. **快速搜索**: 按 `CMD+\` 打开 API 搜索
+3. **快速搜索**: 按 `CMD+\` (Mac) 或 `Ctrl+\` (Windows/Linux) 打开 API 搜索
 4. **跳转代码**: 点击任意 API 端点跳转到对应代码
 
 ## 📊 性能指标
@@ -76,6 +97,7 @@ API Navigator 是从 IntelliJ IDEA 插件 RestfulHelper 移植而来的 VSCode �
 
 ### ✅ 已完成功能
 
+#### 核心功能
 - [x] **基础架构**: TypeScript + VSCode Extension API
 - [x] **Java 解析器**: 基于 java-ast 库的 Spring 注解解析
 - [x] **Worker Threads**: 多线程异步处理架构  
@@ -85,11 +107,30 @@ API Navigator 是从 IntelliJ IDEA 插件 RestfulHelper 移植而来的 VSCode �
 - [x] **代码跳转**: 点击端点跳转到源码位置
 - [x] **文件监控**: 实时检测 Java 文件变更
 
+#### CI/CD 和质量保证
+- [x] **GitHub Actions CI**: Node.js 矩阵测试 (18, 20)
+- [x] **自动化测试**: Jest 测试框架，覆盖率 41.7%
+- [x] **代码质量**: TypeScript 编译检查，ESLint
+- [x] **安全审计**: npm audit 依赖安全检查
+- [x] **自动发布**: VSCode Marketplace 自动发布
+- [x] **依赖管理**: Dependabot 自动依赖更新
+- [x] **应用图标**: 多分辨率专业图标设计 (128px/256px/512px)
+- [x] **测试验证**: 在真实 Spring Boot 项目中测试完成
+- [x] **性能优化**: 大型项目性能调优完成
+  
+  <div align="center">
+    <img src="images/icon.png" alt="128px" width="64" height="64" title="128px">
+    <img src="images/icon@2x.png" alt="256px" width="64" height="64" title="256px">
+    <img src="images/icon@4x.png" alt="512px" width="64" height="64" title="512px">
+    <br>
+    <small>🎨 专业图标设计：指南针 + API 概念，多分辨率适配</small>
+  </div>
+
 ### 🚧 进行中
 
-- [ ] **测试验证**: 在真实 Spring Boot 项目中测试
-- [ ] **性能优化**: 大型项目性能调优
 - [ ] **错误处理**: 完善异常情况处理
+- [ ] **测试覆盖率提升**: 目标从 41.7% 提升到 70%+
+- [ ] **用户反馈收集**: 基于 Marketplace 用户反馈持续改进
 
 ### 📋 待开发  
 
@@ -125,6 +166,81 @@ src/
 - **构建工具**: TypeScript Compiler
 - **Java 解析**: java-ast 库
 - **并发处理**: Worker Threads
+- **测试框架**: Jest
+- **CI/CD**: GitHub Actions
+
+## 🔧 开发环境设置
+
+### 环境要求
+- Node.js 16+ 
+- npm 7+
+- VSCode 1.60.0+
+- Git
+
+### 本地开发
+
+1. **克隆仓库**
+   ```bash
+   git clone --recursive https://github.com/xkcoding/API-Navigator.git
+   cd API-Navigator
+   ```
+
+2. **安装依赖**
+   ```bash
+   npm install
+   ```
+
+3. **编译项目**
+   ```bash
+   npm run compile
+   ```
+
+4. **运行测试**
+   ```bash
+   npm test
+   npm run test:coverage  # 查看覆盖率报告
+   ```
+
+5. **开发调试**
+   - 在 VSCode 中按 `F5` 启动调试
+   - 选择 "Launch Extension" 配置
+   - 新窗口将加载开发中的扩展
+
+### 构建和发布
+
+#### 本地构建
+```bash
+# 编译 TypeScript
+npm run compile
+
+# 构建扩展包
+npm run vscode:prepublish
+
+# 打包 VSIX
+npx vsce package
+```
+
+#### 自动发布流程
+1. **创建 Release**: 在 GitHub 上创建新的 Release
+2. **自动触发**: GitHub Actions 自动执行构建和发布
+3. **多端发布**: 同时发布到 VSCode Marketplace 和 GitHub Releases
+
+### 质量保证
+
+#### 测试策略
+- **单元测试**: Jest 测试核心组件
+- **集成测试**: VSCode 扩展环境测试
+- **CI 测试**: GitHub Actions 多 Node.js 版本测试
+
+#### 代码质量
+- **TypeScript**: 严格类型检查
+- **覆盖率**: 当前 41.7%，目标 70%+
+- **安全审计**: npm audit + Dependabot
+
+#### 设计资源
+- **图标设计**: 查看 [icon-design-spec.md](icon-design-spec.md) 了解设计理念
+- **图标文件**: `images/` 目录包含多分辨率版本
+- **设计概念**: 指南针象征导航 + API 符号，体现扩展功能
 
 ## 🤝 贡献指南
 
@@ -135,6 +251,35 @@ src/
 3. 提交修改: `git commit -am 'Add new feature'`
 4. 推送分支: `git push origin feature/new-feature`
 5. 创建 Pull Request
+
+### 开发规范
+- 遵循 TypeScript 最佳实践
+- 编写单元测试覆盖新功能
+- 更新相关文档
+- 确保 CI 检查通过
+
+## 📞 支持和反馈
+
+### 问题报告
+- [GitHub Issues](https://github.com/xkcoding/API-Navigator/issues): 报告 Bug 或请求新功能
+- [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=xkcoding.xkcoding-api-navigator): 用户评价和反馈
+
+### 社区资源
+- **文档**: [项目 Wiki](https://github.com/xkcoding/API-Navigator/wiki)
+- **讨论**: [GitHub Discussions](https://github.com/xkcoding/API-Navigator/discussions)
+- **更新日志**: [Releases](https://github.com/xkcoding/API-Navigator/releases)
+
+## 📊 项目统计
+
+| 指标 | 状态 |
+|------|------|
+| **代码行数** | ~2,000+ 行 TypeScript |
+| **测试覆盖率** | 41.7% (持续提升中) |
+| **CI/CD 状态** | ✅ 完整自动化 |
+| **发布版本** | v1.0.0 (已发布) |
+| **支持平台** | Windows, macOS, Linux |
+| **Marketplace** | ✅ 已上线 |
+| **测试验证** | ✅ 生产环境验证 |
 
 ## 📄 许可证
 
@@ -151,7 +296,10 @@ src/
 - **作者**: xkcoding (Yangkai.Shen)
 - **邮箱**: 237497819@qq.com  
 - **GitHub**: https://github.com/xkcoding/API-Navigator
+- **VSCode Marketplace**: https://marketplace.visualstudio.com/publishers/xkcoding
 
 ---
 
 **🌟 如果这个项目对你有帮助，请给我们一个 Star！** 
+
+**📦 立即体验**: [安装 API Navigator for Spring Boot](https://marketplace.visualstudio.com/items?itemName=xkcoding.xkcoding-api-navigator) 
