@@ -52,4 +52,4 @@
 
 ---
 
-Lovart.ai 生成地址：https://www.lovart.ai/r/da0zx3m
+Lovart.ai 生成地址：https://www.lovart.ai/r/jyowg8o
