@@ -1,3 +1,36 @@
+## 📋 最新完成任务 (2025-07-25)
+
+### ✅ Level 1 快速修复：树节点显示格式优化 [ARCHIVED]
+- **任务时间**: 2025年7月25日
+- **复杂度**: Level 1 - 快速修复
+- **状态**: ✅ 完成并已归档
+- **版本**: v1.0.0 → v1.0.1
+
+#### 任务描述
+优化API Navigator面板树节点的显示格式，根据用户反馈调整为更清晰的视觉层次。
+
+#### 实施成果
+- **修改前**: `图标 + 方法名` (路径在描述中)
+- **修改后**: `图标 + [HTTP方法] 路径` (方法名在描述中，细体浅色)
+- **文件修改**: `src/ui/ApiNavigatorProvider.ts`
+- **关键方法**: `formatEndpointLabel()`, TreeItem描述设置
+
+#### 用户反馈
+✅ **验证通过** - 用户满意新的显示格式和视觉层次
+
+#### 完整文档链接
+- 📄 **反思文档**: `memory-bank/reflection/reflection-level1-tree-node-format.md`
+- 📄 **归档文档**: `memory-bank/archive/archive-level1-tree-node-format_20250724.md`
+
+#### 归档状态
+- [x] 实施完成
+- [x] 用户验证通过  
+- [x] 反思文档创建
+- [x] 归档文档创建
+- [x] 任务完整归档
+
+---
+
 # 任务跟踪
 
 ## 当前任务: API Navigator VSCode扩展 🚀

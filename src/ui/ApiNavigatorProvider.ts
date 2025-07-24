@@ -233,8 +233,8 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
             // 设置图标
             item.iconPath = this.getMethodIcon(endpoint.method);
             
-            // 设置描述信息
-            item.description = endpoint.path;
+            // 在description中显示方法名，VSCode会自动以较浅的颜色显示
+            item.description = endpoint.methodName;
             item.tooltip = this.createEndpointTooltip(endpoint);
             
             // 设置点击命令
@@ -435,7 +435,7 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
      * 格式化端点标签
      */
     private formatEndpointLabel(endpoint: ApiEndpoint): string {
-        return `${endpoint.methodName}`;
+        return `[${endpoint.method}] ${endpoint.path}`;
     }
 
     /**
