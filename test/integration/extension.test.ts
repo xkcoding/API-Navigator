@@ -91,7 +91,7 @@ describe('API Navigator Extension Integration', () => {
       ];
 
       // Mock 搜索结果
-      jest.spyOn(apiIndexer as any, 'search').mockResolvedValue(mockEndpoints);
+      jest.spyOn(apiIndexer as any, 'searchEndpoints').mockReturnValue(mockEndpoints);
 
       // 执行搜索 (使用 any 类型避免类型错误)
       const searchResults = await (searchProvider as any).searchByQuery('test');
@@ -125,7 +125,7 @@ describe('API Navigator Extension Integration', () => {
         }
       }));
 
-      jest.spyOn(apiIndexer as any, 'search').mockResolvedValue(manyEndpoints);
+      jest.spyOn(apiIndexer as any, 'searchEndpoints').mockReturnValue(manyEndpoints);
 
       const searchResults = await (searchProvider as any).searchByQuery('endpoint');
       expect(searchResults).toHaveLength(1000);
@@ -137,7 +137,7 @@ describe('API Navigator Extension Integration', () => {
       const startTime = Date.now();
       
       // 模拟搜索操作
-      jest.spyOn(apiIndexer as any, 'search').mockResolvedValue([]);
+      jest.spyOn(apiIndexer as any, 'searchEndpoints').mockReturnValue([]);
       await (searchProvider as any).searchByQuery('test');
       
       const duration = Date.now() - startTime;
@@ -147,7 +147,7 @@ describe('API Navigator Extension Integration', () => {
     });
 
     it('应该能处理并发搜索请求', async () => {
-      jest.spyOn(apiIndexer as any, 'search').mockResolvedValue([]);
+      jest.spyOn(apiIndexer as any, 'searchEndpoints').mockReturnValue([]);
 
       const concurrentSearches = Array.from({ length: 10 }, (_, i) =>
         (searchProvider as any).searchByQuery(`test-${i}`)
@@ -178,7 +178,7 @@ describe('API Navigator Extension Integration', () => {
 
     it('应该处理文件系统访问错误', async () => {
       // 模拟文件系统访问失败
-      jest.spyOn(apiIndexer as any, 'search').mockRejectedValue(new Error('File system error'));
+      jest.spyOn(apiIndexer as any, 'searchEndpoints').mockImplementation(() => { throw new Error('File system error'); });
 
       await expect((searchProvider as any).searchByQuery('test')).rejects.toThrow('File system error');
     });

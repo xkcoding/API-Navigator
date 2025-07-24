@@ -14,12 +14,19 @@ const mockVscode = {
       update: jest.fn()
     }),
     onDidChangeConfiguration: jest.fn(),
-    findFiles: jest.fn().mockResolvedValue([])
+    findFiles: jest.fn().mockResolvedValue([]),
+    createFileSystemWatcher: jest.fn().mockReturnValue({
+      onDidCreate: jest.fn(),
+      onDidChange: jest.fn(),
+      onDidDelete: jest.fn(),
+      dispose: jest.fn()
+    })
   },
   window: {
     showErrorMessage: jest.fn(),
     showInformationMessage: jest.fn(),
     showWarningMessage: jest.fn(),
+    showQuickPick: jest.fn(),
     createTreeView: jest.fn(),
     registerTreeDataProvider: jest.fn(),
     setStatusBarMessage: jest.fn()

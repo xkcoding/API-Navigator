@@ -7,7 +7,7 @@ import { IconConfig } from './IconConfig';
 interface TreeNode {
     id: string;
     label: string;
-    type: 'controller' | 'endpoint' | 'loadMore';
+    type: 'controller' | 'endpoint' | 'loading' | 'loadMore';
     endpoint?: ApiEndpoint;
     children?: TreeNode[];
     metadata?: {
@@ -27,10 +27,12 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
     private readonly CONTROLLER_BATCH_SIZE = 20;    // 后续每批20个控制器
     private readonly INITIAL_ENDPOINT_BATCH = 15;   // 初始显示15个端点
     private readonly ENDPOINT_BATCH_SIZE = 30;      // 后续每批30个端点
+    private readonly AUTO_LOAD_DELAY = 100;         // 自动加载延迟（毫秒）
 
     // 分批加载状态
     private controllerLoadState = new Map<string, number>(); // 记录每个级别已加载的数量
     private endpointLoadState = new Map<string, number>();   // 记录每个控制器已加载的端点数量
+    private loadingStates = new Map<string, boolean>();      // 记录正在加载的状态
 
     // 搜索状态
     private searchQuery: string = '';
@@ -62,31 +64,107 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
     }
 
     /**
-     * 处理加载更多请求
+     * 处理加载更多请求（现主要用于兼容性）
      */
     public loadMore(node: TreeNode): void {
+        // 保留原有功能以保证兼容性，但不再推荐使用
         if (!node.metadata) return;
 
         if (node.id === 'loadMore-controllers') {
-            // 加载更多控制器
             const currentLoaded = node.metadata.loadedCount || 0;
             const batchSize = node.metadata.batchSize || this.CONTROLLER_BATCH_SIZE;
             this.controllerLoadState.set('root', currentLoaded + batchSize);
         } else if (node.id === 'loadMore-search') {
-            // 加载更多搜索结果
             const currentLoaded = node.metadata.loadedCount || 0;
             const batchSize = node.metadata.batchSize || this.ENDPOINT_BATCH_SIZE;
             this.controllerLoadState.set('search', currentLoaded + batchSize);
         } else if (node.id.startsWith('loadMore-endpoints-') && node.metadata.controllerClass) {
-            // 加载更多端点
             const controllerClass = node.metadata.controllerClass;
             const currentLoaded = node.metadata.loadedCount || 0;
             const batchSize = node.metadata.batchSize || this.ENDPOINT_BATCH_SIZE;
             this.endpointLoadState.set(controllerClass, currentLoaded + batchSize);
         }
 
-        // 刷新树视图
         this._onDidChangeTreeData.fire();
+    }
+
+    /**
+     * 自动异步加载更多控制器
+     */
+    private async autoLoadMoreControllers(): Promise<void> {
+        if (this.loadingStates.get('controllers')) return; // 防止重复加载
+        
+        this.loadingStates.set('controllers', true);
+        const currentLoaded = this.controllerLoadState.get('root') || this.INITIAL_CONTROLLER_BATCH;
+        const controllerClasses = this.apiIndexer.getAllControllerClasses();
+        
+        if (currentLoaded < controllerClasses.length) {
+            // 延迟加载，给用户更好的体验
+            setTimeout(() => {
+                this.controllerLoadState.set('root', currentLoaded + this.CONTROLLER_BATCH_SIZE);
+                this.loadingStates.set('controllers', false);
+                this._onDidChangeTreeData.fire();
+                
+                // 如果还有更多数据，继续自动加载
+                if (this.controllerLoadState.get('root')! < controllerClasses.length) {
+                    setTimeout(() => this.autoLoadMoreControllers(), this.AUTO_LOAD_DELAY);
+                }
+            }, this.AUTO_LOAD_DELAY);
+        } else {
+            this.loadingStates.set('controllers', false);
+        }
+    }
+
+    /**
+     * 自动异步加载更多端点
+     */
+    private async autoLoadMoreEndpoints(controllerClass: string): Promise<void> {
+        const loadingKey = `endpoints-${controllerClass}`;
+        if (this.loadingStates.get(loadingKey)) return; // 防止重复加载
+        
+        this.loadingStates.set(loadingKey, true);
+        const currentLoaded = this.endpointLoadState.get(controllerClass) || this.INITIAL_ENDPOINT_BATCH;
+        const endpoints = this.apiIndexer.findByController(controllerClass);
+        
+        if (currentLoaded < endpoints.length) {
+            setTimeout(() => {
+                this.endpointLoadState.set(controllerClass, currentLoaded + this.ENDPOINT_BATCH_SIZE);
+                this.loadingStates.set(loadingKey, false);
+                this._onDidChangeTreeData.fire();
+                
+                // 如果还有更多数据，继续自动加载
+                if (this.endpointLoadState.get(controllerClass)! < endpoints.length) {
+                    setTimeout(() => this.autoLoadMoreEndpoints(controllerClass), this.AUTO_LOAD_DELAY);
+                }
+            }, this.AUTO_LOAD_DELAY);
+        } else {
+            this.loadingStates.set(loadingKey, false);
+        }
+    }
+
+    /**
+     * 自动异步加载更多搜索结果
+     */
+    private async autoLoadMoreSearchResults(): Promise<void> {
+        if (this.loadingStates.get('search')) return; // 防止重复加载
+        
+        this.loadingStates.set('search', true);
+        const currentLoaded = this.endpointLoadState.get('search') || this.INITIAL_ENDPOINT_BATCH;
+        
+        if (currentLoaded < this.filteredEndpoints.length) {
+            setTimeout(() => {
+                this.endpointLoadState.set('search', currentLoaded + this.ENDPOINT_BATCH_SIZE);
+                this.loadingStates.set('search', false);
+                this._onDidChangeTreeData.fire();
+                
+                // 如果还有更多数据，继续自动加载
+                if (this.endpointLoadState.get('search')! < this.filteredEndpoints.length) {
+                    setTimeout(() => this.autoLoadMoreSearchResults(), this.AUTO_LOAD_DELAY);
+                }
+            }, this.AUTO_LOAD_DELAY);
+        } else {
+            this.loadingStates.set('search', false);
+        }
     }
 
     /**
@@ -212,20 +290,26 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
     }
 
     /**
-     * 获取控制器节点（支持分批加载）
+     * 获取控制器节点（支持自动异步分批加载）
      */
     private getControllerNodes(): TreeNode[] {
         const controllerClasses = this.apiIndexer.getAllControllerClasses();
         const totalCount = controllerClasses.length;
         
-        // 获取已加载的控制器数量
-        const loadedCount = this.controllerLoadState.get('root') || 0;
-        const batchSize = loadedCount === 0 ? this.INITIAL_CONTROLLER_BATCH : this.CONTROLLER_BATCH_SIZE;
+        // 获取已加载的控制器数量，首次加载显示初始批次
+        let loadedCount = this.controllerLoadState.get('root');
+        if (loadedCount === undefined) {
+            loadedCount = Math.min(this.INITIAL_CONTROLLER_BATCH, totalCount);
+            this.controllerLoadState.set('root', loadedCount);
+            
+            // 如果还有更多数据，自动触发后续异步加载
+            if (loadedCount < totalCount) {
+                setTimeout(() => this.autoLoadMoreControllers(), this.AUTO_LOAD_DELAY);
+            }
+        }
         
-        // 计算这次要显示的控制器
-        const endIndex = Math.min(loadedCount + batchSize, totalCount);
-        const currentBatch = controllerClasses.slice(0, endIndex);
-        
+        // 显示已加载的控制器
+        const currentBatch = controllerClasses.slice(0, loadedCount);
         const nodes: TreeNode[] = currentBatch.map(className => ({
             id: className,
             label: this.formatControllerName(className),
@@ -233,17 +317,12 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
             children: []
         }));
         
-        // 如果还有更多控制器，添加"加载更多"节点
-        if (endIndex < totalCount) {
+        // 如果正在加载更多，显示加载指示器
+        if (this.loadingStates.get('controllers') && loadedCount < totalCount) {
             nodes.push({
-                id: 'loadMore-controllers',
-                label: `加载更多控制器... (${endIndex}/${totalCount})`,
-                type: 'loadMore',
-                metadata: {
-                    loadedCount: endIndex,
-                    totalCount,
-                    batchSize: this.CONTROLLER_BATCH_SIZE
-                }
+                id: 'loading-controllers',
+                label: `⚡ 正在加载更多控制器... (${loadedCount}/${totalCount})`,
+                type: 'loading'
             });
         }
         
@@ -251,7 +330,7 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
     }
 
     /**
-     * 获取端点节点（支持分批加载）
+     * 获取端点节点（支持自动异步分批加载）
      */
     private getEndpointNodes(controllerClass: string): TreeNode[] {
         const endpoints = this.apiIndexer.findByController(controllerClass);
@@ -265,14 +344,20 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
             return a.path.localeCompare(b.path);
         });
 
-        // 获取已加载的端点数量
-        const loadedCount = this.endpointLoadState.get(controllerClass) || 0;
-        const batchSize = loadedCount === 0 ? this.INITIAL_ENDPOINT_BATCH : this.ENDPOINT_BATCH_SIZE;
+        // 获取已加载的端点数量，首次加载显示初始批次
+        let loadedCount = this.endpointLoadState.get(controllerClass);
+        if (loadedCount === undefined) {
+            loadedCount = Math.min(this.INITIAL_ENDPOINT_BATCH, totalCount);
+            this.endpointLoadState.set(controllerClass, loadedCount);
+            
+            // 如果还有更多数据，自动触发后续异步加载
+            if (loadedCount < totalCount) {
+                setTimeout(() => this.autoLoadMoreEndpoints(controllerClass), this.AUTO_LOAD_DELAY);
+            }
+        }
         
-        // 计算这次要显示的端点
-        const endIndex = Math.min(loadedCount + batchSize, totalCount);
-        const currentBatch = endpoints.slice(0, endIndex);
-        
+        // 显示已加载的端点
+        const currentBatch = endpoints.slice(0, loadedCount);
         const nodes: TreeNode[] = currentBatch.map(endpoint => ({
             id: endpoint.id,
             label: endpoint.methodName,
@@ -280,18 +365,13 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
             endpoint
         }));
         
-        // 如果还有更多端点，添加"加载更多"节点
-        if (endIndex < totalCount) {
+        // 如果正在加载更多，显示加载指示器
+        const loadingKey = `endpoints-${controllerClass}`;
+        if (this.loadingStates.get(loadingKey) && loadedCount < totalCount) {
             nodes.push({
-                id: `loadMore-endpoints-${controllerClass}`,
-                label: `加载更多端点... (${endIndex}/${totalCount})`,
-                type: 'loadMore',
-                metadata: {
-                    controllerClass,
-                    loadedCount: endIndex,
-                    totalCount,
-                    batchSize: this.ENDPOINT_BATCH_SIZE
-                }
+                id: `loading-endpoints-${controllerClass}`,
+                label: `⚡ 正在加载更多端点... (${loadedCount}/${totalCount})`,
+                type: 'loading'
             });
         }
         
