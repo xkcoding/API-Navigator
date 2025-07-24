@@ -46,6 +46,20 @@
       {
         "command": "apiNavigator.openApi",
         "title": "Open API"
+      },
+      {
+        "command": "apiNavigator.loadMore",
+        "title": "Load More"
+      },
+      {
+        "command": "apiNavigator.searchInPanel",
+        "title": "Search in Panel",
+        "icon": "$(search)"
+      },
+      {
+        "command": "apiNavigator.clearPanelSearch",
+        "title": "Clear Search",
+        "icon": "$(clear-all)"
       }
     ],
     "keybindings": [
@@ -60,12 +74,22 @@
       "view/title": [
         {
           "command": "apiNavigator.refresh",
-          "when": "view == apiNavigator",
+          "when": "view == apiNavigatorView",
           "group": "navigation"
         },
         {
           "command": "apiNavigator.search",
-          "when": "view == apiNavigator",
+          "when": "view == apiNavigatorView",
+          "group": "navigation"
+        },
+        {
+          "command": "apiNavigator.searchInPanel",
+          "when": "view == apiNavigatorView",
+          "group": "navigation"
+        },
+        {
+          "command": "apiNavigator.clearPanelSearch",
+          "when": "view == apiNavigatorView",
           "group": "navigation"
         }
       ]

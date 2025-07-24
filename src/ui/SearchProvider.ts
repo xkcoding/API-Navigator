@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { ApiIndexer } from '../core/ApiIndexer';
 import { ApiEndpoint, HttpMethod } from '../core/types';
+import { IconConfig } from './IconConfig';
 
 interface ApiQuickPickItem extends vscode.QuickPickItem {
     endpoint: ApiEndpoint;
@@ -70,14 +71,7 @@ export class SearchProvider {
      * 获取方法图标
      */
     private getMethodIcon(method: HttpMethod): string {
-        const iconMap: Record<HttpMethod, string> = {
-            GET: 'arrow-down',        // 下载图标 (GET)
-            POST: 'plus',             // 加号图标 (POST)
-            PUT: 'pencil',            // 编辑图标 (PUT)
-            DELETE: 'trash',          // 删除图标 (DELETE)
-            PATCH: 'diff-modified'    // 修改图标 (PATCH)
-        };
-        return iconMap[method] || 'circle-outline';
+        return IconConfig.getMethodThemeIcon(method);
     }
 
     /**

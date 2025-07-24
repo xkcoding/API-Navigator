@@ -36,6 +36,26 @@ export async function activate(context: vscode.ExtensionContext) {
             if (endpoint && endpoint.location) {
                 goToLocation(endpoint.location);
             }
+        }),
+
+        vscode.commands.registerCommand('apiNavigator.loadMore', (node) => {
+            apiNavigatorProvider.loadMore(node);
+        }),
+
+        vscode.commands.registerCommand('apiNavigator.searchInPanel', async () => {
+            const query = await vscode.window.showInputBox({
+                prompt: '请输入搜索关键字（路径、控制器、方法名或HTTP方法）',
+                placeHolder: '例如：/api/user、UserController、GET',
+                value: apiNavigatorProvider.getSearchQuery()
+            });
+            
+            if (query !== undefined) {
+                apiNavigatorProvider.setSearchQuery(query);
+            }
+        }),
+
+        vscode.commands.registerCommand('apiNavigator.clearPanelSearch', () => {
+            apiNavigatorProvider.clearSearch();
         })
     ];
 

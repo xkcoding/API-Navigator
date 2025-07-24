@@ -100,17 +100,52 @@ export class ApiIndexer {
         try {
             const files = await vscode.workspace.findFiles(
                 new vscode.RelativePattern(rootPath, '**/*.java'),
-                new vscode.RelativePattern(rootPath, '{**/node_modules/**,**/target/**,**/build/**,**/.git/**}')
+                new vscode.RelativePattern(rootPath, '{**/node_modules/**,**/target/**,**/build/**,**/.git/**,**/.*/**}')
             );
 
             for (const file of files) {
-                javaFiles.push(file.fsPath);
+                // 额外检查：确保文件路径中不包含隐藏文件夹
+                if (!this.shouldExcludeFile(file.fsPath)) {
+                    javaFiles.push(file.fsPath);
+                }
             }
         } catch (error) {
             console.error('查找 Java 文件失败:', error);
         }
 
         return javaFiles;
+    }
+
+    /**
+     * 检查是否应该排除文件
+     */
+    private shouldExcludeFile(filePath: string): boolean {
+        const excludePatterns = [
+            '/.history/',    // Cursor 历史文件夹
+            '/.vscode/',     // VSCode 配置文件夹
+            '/.idea/',       // IntelliJ IDEA 配置文件夹
+            '/.git/',        // Git 文件夹
+            '/node_modules/', // Node.js 依赖
+            '/target/',      // Maven 构建目录
+            '/build/',       // Gradle 构建目录
+        ];
+
+        // 检查路径中是否包含需要排除的模式
+        for (const pattern of excludePatterns) {
+            if (filePath.includes(pattern)) {
+                return true;
+            }
+        }
+
+        // 检查是否有隐藏文件夹（以 .开头的文件夹）
+        const pathParts = filePath.split(path.sep);
+        for (const part of pathParts) {
+            if (part.startsWith('.') && part.length > 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
