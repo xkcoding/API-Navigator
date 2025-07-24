@@ -31,13 +31,13 @@ jobs:
       - name: Package extension
         id: package
         run: |
-          PACKAGE_NAME=$(npx vsce package --out xkcoding-api-navigator.vsix | grep "Packaged:" | awk '{print $2}' || echo "xkcoding-api-navigator.vsix")
+          PACKAGE_NAME=$(npx @vscode/vsce package --out xkcoding-api-navigator.vsix | grep "Packaged:" | awk '{print $2}' || echo "xkcoding-api-navigator.vsix")
           echo "package_name=xkcoding-api-navigator.vsix" >> $GITHUB_OUTPUT
       
       - name: Publish to VSCode Marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx vsce publish --packagePath xkcoding-api-navigator.vsix
+        run: npx @vscode/vsce publish --packagePath xkcoding-api-navigator.vsix
       
       - name: Upload VSIX to release
         run: |

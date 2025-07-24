@@ -1,7 +1,7 @@
 # API Navigator for Spring Boot
 
 <div align="center">
-  <img src="images/icon@2x.png" alt="API Navigator Logo" width="128" height="128">
+  <img src="images/icon.png" alt="API Navigator Logo" width="128" height="128">
   
   [![CI](https://github.com/xkcoding/API-Navigator/actions/workflows/ci.yml/badge.svg)](https://github.com/xkcoding/API-Navigator/actions/workflows/ci.yml)
   [![Release](https://github.com/xkcoding/API-Navigator/actions/workflows/release.yml/badge.svg)](https://github.com/xkcoding/API-Navigator/actions/workflows/release.yml)
@@ -120,8 +120,8 @@ code --install-extension xkcoding.xkcoding-api-navigator
   
   <div align="center">
     <img src="images/icon.png" alt="128px" width="64" height="64" title="128px">
-    <img src="images/icon@2x.png" alt="256px" width="64" height="64" title="256px">
-    <img src="images/icon@4x.png" alt="512px" width="64" height="64" title="512px">
+    <img src="images/icon.png" alt="256px" width="64" height="64" title="256px">
+    <img src="images/icon.png" alt="512px" width="64" height="64" title="512px">
     <br>
     <small>🎨 专业图标设计：指南针 + API 概念，多分辨率适配</small>
   </div>
@@ -216,9 +216,11 @@ npm run compile
 # 构建扩展包
 npm run vscode:prepublish
 
-# 打包 VSIX
-npx vsce package
+# 打包 VSIX (使用新版工具)
+npx @vscode/vsce package
 ```
+
+> **⚠️ 重要**: 请使用新版 `@vscode/vsce` 工具，旧版 `vsce` 已被弃用。如遇冲突，请使用 `npm install -g @vscode/vsce --force`
 
 #### 自动发布流程
 1. **创建 Release**: 在 GitHub 上创建新的 Release

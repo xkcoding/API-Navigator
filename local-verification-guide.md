@@ -33,27 +33,49 @@ npm test -- test/core/JavaASTParser.test.ts
 ### 第二步：构建VSIX包
 
 ```bash
-# 安装打包工具
-npm install -g vsce
+# 安装新版打包工具 (旧版vsce已弃用)
+npm install -g @vscode/vsce --force
 
 # 打包扩展
 vsce package
 
-# 产生文件: api-navigator-1.0.0.vsix
+# 产生文件: xkcoding-api-navigator-1.0.0.vsix
+```
+
+#### ⚠️ 常见打包问题解决
+
+**问题1: vsce工具版本冲突**
+```bash
+# 错误: npm ERR! EEXIST: file already exists
+# 解决: 强制安装新版本
+npm install -g @vscode/vsce --force
+```
+
+**问题2: README.md图片引用错误**
+```bash
+# 错误: Invalid image source in README.md: images/icon@2x.png
+# 原因: 文件名包含特殊字符@
+# 解决: 修改README.md，使用基础图标文件
+```
+
+**问题3: 包体积过大警告**
+```bash
+# 警告: 632 files, 2.82MB - 建议bundle优化
+# 解决: 添加.vscodeignore文件排除不必要文件 (可选)
 ```
 
 ### 第三步：在VSCode中安装测试
 
 1. **安装扩展**:
    ```bash
-   code --install-extension api-navigator-1.0.0.vsix
+   code --install-extension xkcoding-api-navigator-1.0.0.vsix
    ```
 
 2. **或手动安装**:
    - 打开VSCode
    - 按 `Cmd+Shift+P` (macOS) 或 `Ctrl+Shift+P` (Windows/Linux)
    - 输入 "Install from VSIX"
-   - 选择生成的 `api-navigator-1.0.0.vsix` 文件
+   - 选择生成的 `xkcoding-api-navigator-1.0.0.vsix` 文件
 
 ## 🧪 功能验证测试
 
@@ -178,6 +200,14 @@ public class TestController {
 - 检查文件路径是否正确
 - 验证AST解析是否成功
 
+#### 问题4: 打包失败
+**症状**: `vsce package` 命令失败
+**常见原因和解决**:
+- **工具过时**: 使用 `npm install -g @vscode/vsce --force`
+- **图片引用错误**: 检查README.md中是否有特殊字符的图片文件名
+- **依赖冲突**: 执行 `npm ci` 重新安装清洁依赖
+- **编译错误**: 先运行 `npm run compile` 确保编译成功
+
 ## 📈 成功标准
 
 ### 功能要求
@@ -298,9 +328,10 @@ API Navigator 现在支持自动读取和应用项目的 `.gitignore` 文件规�
 ## 📊 验证检查清单
 
 ### 安装验证 ✅ **已完成**
-- [x] VSIX文件成功生成
+- [x] VSIX文件成功生成 (`xkcoding-api-navigator-1.0.0.vsix`, 2.82MB)
 - [x] VSCode扩展安装无错误
 - [x] 扩展在运行中的扩展列表中显示
+- [x] 新版vsce工具 (`@vscode/vsce`) 打包成功
 
 ### 功能验证 ✅ **已完成**
 - [x] API Navigator面板正确显示
@@ -344,9 +375,24 @@ API Navigator 现在支持自动读取和应用项目的 `.gitignore` 文件规�
 
 ---
 
-**最后更新**: 2025-07-24 14:39:11 (北京时间)
+## 🎯 2025-07-24 打包更新记录
+
+### ✅ 关键修复和改进
+1. **工具升级**: 从过时的 `vsce` 升级到 `@vscode/vsce`
+2. **文档修复**: 解决README.md中特殊字符图片引用问题
+3. **CI/CD修复**: 更新release.yml中的打包命令
+4. **指南完善**: 添加常见打包问题解决方案
+
+### 📦 最终打包结果
+- **文件**: `xkcoding-api-navigator-1.0.0.vsix`
+- **大小**: 2.82MB (632文件)
+- **状态**: ✅ 打包成功，可直接安装
+
+---
+
+**最后更新**: 2025-07-24 21:15:00 (北京时间)
 **验证版本**: API Navigator v1.0.0
-**状态**: 🎊 **QA/TEST 全面验证完成 - 准备发布**
+**状态**: 🎊 **本地打包验证完成 - 工具链升级**
 
 ## 🎯 QA/TEST 验证完成状态 ✅
 
