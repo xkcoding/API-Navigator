@@ -216,7 +216,7 @@ export class ApiIndexer {
     /**
      * 查找 Java 文件 - 使用基础排除 + gitignore验证
      */
-    private async findJavaFiles(rootPath: string): Promise<string[]> {
+    public async findJavaFiles(rootPath: string): Promise<string[]> {
         const javaFiles: string[] = [];
         
         try {
@@ -532,7 +532,7 @@ export class ApiIndexer {
     /**
      * 删除文件相关的所有端点
      */
-    private removeEndpointsByFile(filePath: string): void {
+    private removeEndpointsByFile(filePath: string): number {
         const endpointsToRemove = Array.from(this.endpoints.values())
             .filter(endpoint => endpoint.location.filePath === filePath);
 
@@ -544,6 +544,8 @@ export class ApiIndexer {
         if (endpointsToRemove.length > 0) {
             this._onDidChange.fire();
         }
+        
+        return endpointsToRemove.length;
     }
 
     /**
@@ -603,6 +605,187 @@ export class ApiIndexer {
             totalEndpoints: this.endpoints.size,
             controllerCount: this.getAllControllerClasses().length,
             methodCounts
+        };
+    }
+
+    // ==================== PERSISTENT CACHE SUPPORT ====================
+
+    /**
+     * 从缓存数据初始化索引器
+     * 用于快速启动，避免重新扫描所有文件
+     */
+    public async initializeFromCache(cacheData: import('./types').CacheData): Promise<void> {
+        console.log(`正在从缓存初始化 API 索引器: ${cacheData.endpoints.length} 个端点`);
+
+        try {
+            // 清空现有数据
+            this.endpoints.clear();
+            this.pathIndex.clear();
+            this.classIndex.clear();
+
+            // 加载缓存的端点数据
+            for (const endpoint of cacheData.endpoints) {
+                this.endpoints.set(endpoint.id, endpoint);
+            }
+
+            // 重建索引
+            this.rebuildIndices();
+
+            // 初始化 gitignore 规则（如果还没有初始化）
+            if (!this.ignoreInstance) {
+                await this.initializeIgnoreRules();
+            }
+
+            // 设置文件监控
+            this.setupFileWatcher();
+
+            console.log(`从缓存初始化完成，共加载 ${this.endpoints.size} 个端点`);
+
+            // 触发变更事件
+            this._onDidChange.fire();
+
+        } catch (error) {
+            console.error('从缓存初始化失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 增量更新指定文件
+     * 只解析变更的文件，提高性能
+     */
+    public async updateFiles(filePaths: string[]): Promise<void> {
+        if (filePaths.length === 0) {
+            return;
+        }
+
+        console.log(`正在增量更新 ${filePaths.length} 个文件...`);
+
+        try {
+            // 使用工作线程池批量解析文件
+            const newEndpoints = await this.workerPool.batchParseFiles(filePaths);
+            
+            // 先删除这些文件的旧端点
+            for (const filePath of filePaths) {
+                this.removeEndpointsByFile(filePath);
+            }
+
+            // 添加新解析的端点
+            this.addEndpoints(newEndpoints);
+
+            console.log(`增量更新完成，处理了 ${filePaths.length} 个文件，新增/更新 ${newEndpoints.length} 个端点`);
+
+            // 触发变更事件
+            this._onDidChange.fire();
+
+        } catch (error) {
+            console.error('增量更新失败，回退到单线程模式:', error);
+            
+            // 降级到单线程解析
+            for (const filePath of filePaths) {
+                await this.updateFile(filePath, 'change');
+            }
+        }
+    }
+
+    /**
+     * 删除指定文件的所有端点
+     * 用于处理文件删除
+     */
+    public removeFileEndpoints(filePath: string): void {
+        console.log(`正在删除文件端点: ${filePath}`);
+        
+        const removedCount = this.removeEndpointsByFile(filePath);
+        
+        if (removedCount > 0) {
+            console.log(`已删除 ${removedCount} 个端点`);
+            this._onDidChange.fire();
+        }
+    }
+
+    /**
+     * 重建路径和类索引
+     * 在从缓存加载后调用
+     */
+    private rebuildIndices(): void {
+        this.pathIndex.clear();
+        this.classIndex.clear();
+
+        for (const endpoint of this.endpoints.values()) {
+            // 重建路径索引
+            const pathParts = endpoint.path.toLowerCase().split('/').filter(part => part.length > 0);
+            for (const part of pathParts) {
+                if (!this.pathIndex.has(part)) {
+                    this.pathIndex.set(part, new Set());
+                }
+                this.pathIndex.get(part)!.add(endpoint.id);
+            }
+
+            // 重建类索引
+            const className = endpoint.controllerClass.toLowerCase();
+            const classNameParts = className.split('.').concat(className.split(/(?=[A-Z])/));
+            
+            for (const part of classNameParts) {
+                if (part.length > 0) {
+                    if (!this.classIndex.has(part)) {
+                        this.classIndex.set(part, new Set());
+                    }
+                    this.classIndex.get(part)!.add(endpoint.id);
+                }
+            }
+        }
+
+        console.log(`索引重建完成: 路径索引 ${this.pathIndex.size} 项, 类索引 ${this.classIndex.size} 项`);
+    }
+
+    /**
+     * 获取文件相关的端点数量（用于统计）
+     */
+    public getFileEndpointCount(filePath: string): number {
+        let count = 0;
+        for (const endpoint of this.endpoints.values()) {
+            if (endpoint.location.filePath === filePath) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 获取所有文件路径（用于变更检测）
+     */
+    public getAllFilePaths(): string[] {
+        const filePaths = new Set<string>();
+        for (const endpoint of this.endpoints.values()) {
+            filePaths.add(endpoint.location.filePath);
+        }
+        return Array.from(filePaths);
+    }
+
+    /**
+     * 检查索引器是否为空
+     */
+    public isEmpty(): boolean {
+        return this.endpoints.size === 0;
+    }
+
+    /**
+     * 获取缓存相关统计信息
+     */
+    public getCacheStatistics(): {
+        endpointCount: number;
+        fileCount: number;
+        controllerCount: number;
+        avgEndpointsPerFile: number;
+    } {
+        const fileCount = this.getAllFilePaths().length;
+        const controllerCount = this.getAllControllerClasses().length;
+        
+        return {
+            endpointCount: this.endpoints.size,
+            fileCount,
+            controllerCount,
+            avgEndpointsPerFile: fileCount > 0 ? Math.round(this.endpoints.size / fileCount * 100) / 100 : 0
         };
     }
 } 

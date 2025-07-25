@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ApiIndexer } from '../core/ApiIndexer';
-import { ApiEndpoint, HttpMethod } from '../core/types';
+import { ApiEndpoint, HttpMethod, CacheStatus, RefreshProgress } from '../core/types';
 import { IconConfig } from './IconConfig';
 
 interface TreeNode {
@@ -15,6 +15,8 @@ interface TreeNode {
         loadedCount?: number;
         totalCount?: number;
         batchSize?: number;
+        cacheStatus?: CacheStatus;
+        cacheMessage?: string;
     };
 }
 
@@ -38,9 +40,17 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
     private searchQuery: string = '';
     private filteredEndpoints: ApiEndpoint[] = [];
 
-    constructor(private apiIndexer: ApiIndexer) {
+    // 缓存状态
+    private currentCacheStatus: CacheStatus = CacheStatus.NOT_FOUND;
+    private cacheMessage: string = '';
+    private cacheManager?: any; // PersistentIndexManager类型，避免循环导入
+
+    constructor(private apiIndexer: ApiIndexer, cacheManager?: any) {
+        this.cacheManager = cacheManager;
         // 监听索引器的变化
         this.setupIndexerListeners();
+        // 设置缓存状态监听器
+        this.setupCacheStatusListeners();
     }
 
     /**
@@ -51,6 +61,111 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
         this.apiIndexer.onDidChange(() => {
             this.refresh();
         });
+    }
+
+    /**
+     * 设置缓存状态监听器
+     */
+    private setupCacheStatusListeners(): void {
+        if (this.cacheManager && typeof this.cacheManager.onCacheStatusChanged === 'function') {
+            this.cacheManager.onCacheStatusChanged((progress: RefreshProgress) => {
+                this.updateCacheStatus(progress);
+            });
+        }
+    }
+
+    /**
+     * 更新缓存状态
+     */
+    private updateCacheStatus(progress: RefreshProgress): void {
+        this.currentCacheStatus = progress.status;
+        this.cacheMessage = progress.message;
+        
+        // 根据缓存状态显示不同类型的通知
+        this.showCacheStatusNotification(progress.status, progress.message);
+    }
+
+    /**
+     * 显示缓存状态通知
+     */
+    private showCacheStatusNotification(status: CacheStatus, message: string): void {
+        const statusIcon = this.getCacheStatusIcon(status);
+        const notificationMessage = `${statusIcon} ${message || this.getDefaultCacheMessage(status)}`;
+        
+        switch (status) {
+            case CacheStatus.LOADED:
+            case CacheStatus.UPDATED:
+                // 成功状态 - 显示信息通知
+                vscode.window.showInformationMessage(notificationMessage);
+                break;
+                
+            case CacheStatus.NO_CHANGES:
+                // 无变更 - 显示状态栏消息（3秒自动消失）
+                vscode.window.setStatusBarMessage(notificationMessage, 3000);
+                break;
+                
+            case CacheStatus.ERROR:
+            case CacheStatus.NOT_FOUND:
+                // 错误状态 - 显示警告通知
+                vscode.window.showWarningMessage(notificationMessage);
+                break;
+                
+            case CacheStatus.LOADING:
+            case CacheStatus.REFRESHING:
+                // 加载状态 - 显示状态栏消息（不自动消失，等待后续状态更新）
+                vscode.window.setStatusBarMessage(notificationMessage);
+                break;
+        }
+    }
+
+
+
+    /**
+     * 获取缓存状态图标
+     */
+    private getCacheStatusIcon(status: CacheStatus): string {
+        switch (status) {
+            case CacheStatus.LOADING:
+                return '⏳';
+            case CacheStatus.LOADED:
+                return '✅';
+            case CacheStatus.REFRESHING:
+                return '🔄';
+            case CacheStatus.UPDATED:
+                return '🔄';
+            case CacheStatus.NO_CHANGES:
+                return '✅';
+            case CacheStatus.ERROR:
+                return '❌';
+            case CacheStatus.NOT_FOUND:
+                return '💾';
+            default:
+                return '📄';
+        }
+    }
+
+    /**
+     * 获取默认缓存状态消息
+     */
+    private getDefaultCacheMessage(status: CacheStatus): string {
+        switch (status) {
+            case CacheStatus.LOADING:
+                return '正在加载缓存...';
+            case CacheStatus.LOADED:
+                return '缓存已加载';
+            case CacheStatus.REFRESHING:
+                return '正在刷新...';
+            case CacheStatus.UPDATED:
+                return '缓存已更新';
+            case CacheStatus.NO_CHANGES:
+                return '无变更';
+            case CacheStatus.ERROR:
+                return '缓存错误';
+            case CacheStatus.NOT_FOUND:
+                return '无缓存';
+            default:
+                return '未知状态';
+        }
     }
 
     /**
@@ -264,6 +379,16 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
             
             item.contextValue = 'loadMore';
             return item;
+        } else if (element.type === 'loading') {
+            const item = new vscode.TreeItem(
+                element.label,
+                vscode.TreeItemCollapsibleState.None
+            );
+            
+            item.iconPath = new vscode.ThemeIcon('loading~spin');
+            item.tooltip = '正在加载...';
+            item.contextValue = 'loading';
+            return item;
         }
 
         return new vscode.TreeItem('Unknown');
@@ -274,13 +399,18 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
      */
     getChildren(element?: TreeNode): Thenable<TreeNode[]> {
         if (!element) {
+            // 根级别：显示主要内容
+            const nodes: TreeNode[] = [];
+            
             if (this.isSearchMode()) {
-                // 搜索模式：直接返回扁平化的搜索结果
-                return Promise.resolve(this.getSearchResultNodes());
+                // 搜索模式：添加搜索结果
+                nodes.push(...this.getSearchResultNodes());
             } else {
-                // 正常模式：返回控制器分组
-                return Promise.resolve(this.getControllerNodes());
+                // 正常模式：添加控制器分组
+                nodes.push(...this.getControllerNodes());
             }
+            
+            return Promise.resolve(nodes);
         } else if (element.type === 'controller' && !this.isSearchMode()) {
             // 控制器节点：返回该控制器的端点（仅在非搜索模式）
             return Promise.resolve(this.getEndpointNodes(element.id));
@@ -514,5 +644,106 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
      */
     resolveTreeItem(item: vscode.TreeItem, element: TreeNode, token: vscode.CancellationToken): vscode.ProviderResult<vscode.TreeItem> {
         return item;
+    }
+
+    // ==================== CACHE MANAGEMENT COMMANDS ====================
+
+    /**
+     * 清除缓存命令
+     */
+    public async clearCacheCommand(): Promise<void> {
+        if (!this.cacheManager) {
+            vscode.window.showWarningMessage('缓存管理器未初始化');
+            return;
+        }
+
+        const choice = await vscode.window.showWarningMessage(
+            '确定要清除所有缓存数据吗？下次启动时将重新索引。',
+            { modal: true },
+            '确定清除',
+            '取消'
+        );
+
+        if (choice === '确定清除') {
+            try {
+                await this.cacheManager.clearCache();
+                vscode.window.showInformationMessage('缓存已清除');
+            } catch (error) {
+                vscode.window.showErrorMessage(`清除缓存失败: ${error}`);
+            }
+        }
+    }
+
+    /**
+     * 显示缓存信息命令
+     */
+    public async showCacheInfoCommand(): Promise<void> {
+        if (!this.cacheManager) {
+            vscode.window.showWarningMessage('缓存管理器未初始化');
+            return;
+        }
+
+        try {
+            const cacheInfo = await this.cacheManager.getCacheInfo();
+            
+            const infoLines = [
+                '📊 缓存统计信息',
+                '',
+                '🎯 当前项目缓存:',
+                cacheInfo.current ? 
+                    `  • 端点数量: ${cacheInfo.current.endpoints.length}` :
+                    '  • 无缓存数据',
+                cacheInfo.current ? 
+                    `  • 文件数量: ${cacheInfo.current.statistics.totalFiles}` : '',
+                cacheInfo.current ?
+                    `  • 缓存大小: ${Math.round(cacheInfo.current.statistics.cacheSize / 1024)}KB` : '',
+                '',
+                '⚡ 性能指标:',
+                `  • 上次加载时间: ${cacheInfo.performance.lastLoadTime}ms`,
+                `  • 上次刷新时间: ${cacheInfo.performance.lastRefreshTime}ms`,
+                `  • 缓存命中率: ${Math.round(cacheInfo.performance.cacheHitRate * 100)}%`,
+                '',
+                '🌍 全局缓存:',
+                `  • 缓存文件数: ${cacheInfo.global.totalCaches}`,
+                `  • 总大小: ${Math.round(cacheInfo.global.totalSize / 1024)}KB`
+            ].filter(line => line !== '').join('\n');
+
+            await vscode.window.showInformationMessage(infoLines, { modal: true });
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`获取缓存信息失败: ${error}`);
+        }
+    }
+
+    /**
+     * 手动刷新缓存命令
+     */
+    public async manualRefreshCommand(): Promise<void> {
+        if (!this.cacheManager) {
+            vscode.window.showWarningMessage('缓存管理器未初始化');
+            return;
+        }
+
+        try {
+            vscode.window.showInformationMessage('正在手动刷新缓存...');
+            await this.cacheManager.manualRefresh();
+        } catch (error) {
+            vscode.window.showErrorMessage(`手动刷新失败: ${error}`);
+        }
+    }
+
+    /**
+     * 获取缓存管理器（供外部使用）
+     */
+    public getCacheManager(): any {
+        return this.cacheManager;
+    }
+
+    /**
+     * 设置缓存管理器（供外部使用）
+     */
+    public setCacheManager(cacheManager: any): void {
+        this.cacheManager = cacheManager;
+        this.setupCacheStatusListeners();
     }
 } 

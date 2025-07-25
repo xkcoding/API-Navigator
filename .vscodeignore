@@ -27,6 +27,7 @@ yarn.lock
 .history/**
 .specstory/**
 .memory-bank/**
+memory-bank/**
 
 # 系统文件
 .DS_Store

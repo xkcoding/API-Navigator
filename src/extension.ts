@@ -3,6 +3,10 @@ import { ApiNavigatorProvider } from './ui/ApiNavigatorProvider';
 import { ApiIndexer } from './core/ApiIndexer';
 import { WorkerPool } from './core/WorkerPool';
 import { SearchProvider } from './ui/SearchProvider';
+import { PersistentIndexManager } from './core/PersistentIndexManager';
+
+// 全局引用，用于deactivate清理
+let globalCacheManager: PersistentIndexManager | null = null;
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('API Navigator 插件正在激活...');
@@ -13,7 +17,13 @@ export async function activate(context: vscode.ExtensionContext) {
     // 初始化核心组件
     const workerPool = new WorkerPool(4);
     const apiIndexer = new ApiIndexer(workerPool);
-    const apiNavigatorProvider = new ApiNavigatorProvider(apiIndexer);
+    
+    // 初始化持久化缓存管理器
+    const cacheManager = new PersistentIndexManager(apiIndexer);
+    globalCacheManager = cacheManager;
+    
+    // 初始化UI组件，传入缓存管理器
+    const apiNavigatorProvider = new ApiNavigatorProvider(apiIndexer, cacheManager);
     const searchProvider = new SearchProvider(apiIndexer);
 
     // 注册侧边栏树视图
@@ -56,24 +66,33 @@ export async function activate(context: vscode.ExtensionContext) {
 
         vscode.commands.registerCommand('apiNavigator.clearPanelSearch', () => {
             apiNavigatorProvider.clearSearch();
+        }),
+
+        // 缓存管理命令
+        vscode.commands.registerCommand('apiNavigator.clearCache', () => {
+            apiNavigatorProvider.clearCacheCommand();
+        }),
+
+        vscode.commands.registerCommand('apiNavigator.showCacheInfo', () => {
+            apiNavigatorProvider.showCacheInfoCommand();
+        }),
+
+        vscode.commands.registerCommand('apiNavigator.refreshCache', () => {
+            apiNavigatorProvider.manualRefreshCommand();
         })
     ];
 
     // 添加到上下文
     context.subscriptions.push(treeView, ...commands);
 
-    // 初始化索引
+    // 初始化索引（使用缓存）
     try {
-        await apiIndexer.initialize();
+        await cacheManager.initializeWithCache();
         console.log('API Navigator 插件激活完成');
     } catch (error) {
         console.error('API Navigator 初始化失败:', error);
         vscode.window.showErrorMessage(`API Navigator 初始化失败: ${error}`);
     }
-}
-
-export function deactivate() {
-    console.log('API Navigator 插件正在停用...');
 }
 
 async function goToLocation(location: any) {
@@ -116,5 +135,29 @@ async function checkAndSetJavaContext() {
         console.error('检测Java文件失败:', error);
         // 默认设置为true，确保面板显示
         await vscode.commands.executeCommand('setContext', 'workspaceHasJavaFiles', true);
+    }
+}
+
+/**
+ * 扩展停用时的清理函数
+ */
+export function deactivate() {
+    console.log('API Navigator 插件正在停用...');
+    
+    try {
+        // 保存当前缓存状态
+        if (globalCacheManager) {
+            globalCacheManager.saveCurrentStateToCache().catch(error => {
+                console.error('保存缓存状态失败:', error);
+            });
+            
+            // 清理资源
+            globalCacheManager.dispose();
+            globalCacheManager = null;
+        }
+        
+        console.log('API Navigator 插件停用完成');
+    } catch (error) {
+        console.error('插件停用时发生错误:', error);
     }
 } 
