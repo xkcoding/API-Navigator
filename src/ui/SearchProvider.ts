@@ -2,13 +2,18 @@ import * as vscode from 'vscode';
 import { ApiIndexer } from '../core/ApiIndexer';
 import { ApiEndpoint, HttpMethod } from '../core/types';
 import { IconConfig } from './IconConfig';
+import { StatisticsWebView } from './StatisticsWebView';
 
 interface ApiQuickPickItem extends vscode.QuickPickItem {
     endpoint: ApiEndpoint;
 }
 
 export class SearchProvider {
-    constructor(private apiIndexer: ApiIndexer) {}
+    private statisticsWebView: StatisticsWebView;
+
+    constructor(private apiIndexer: ApiIndexer, extensionUri: vscode.Uri) {
+        this.statisticsWebView = new StatisticsWebView(extensionUri, apiIndexer);
+    }
 
     /**
      * 显示快速搜索面板
@@ -222,22 +227,153 @@ export class SearchProvider {
      * 显示统计信息
      */
     public async showStatistics(): Promise<void> {
+        this.statisticsWebView.show();
+    }
+
+    /**
+     * 显示统计信息（旧版本，保留作为备用）
+     */
+    public async showStatisticsLegacy(): Promise<void> {
         const stats = this.apiIndexer.getStatistics();
+        const controllers = this.apiIndexer.getAllControllerClasses();
+        const endpoints = this.apiIndexer.getAllEndpoints();
         
-        const items = [
-            `📊 总端点数: ${stats.totalEndpoints}`,
-            `🏛️ 控制器数: ${stats.controllerCount}`,
-            '',
-            '📈 HTTP 方法分布:',
-            `  GET: ${stats.methodCounts.GET}`,
-            `  POST: ${stats.methodCounts.POST}`,
-            `  PUT: ${stats.methodCounts.PUT}`,
-            `  DELETE: ${stats.methodCounts.DELETE}`,
-            `  PATCH: ${stats.methodCounts.PATCH}`
+        if (endpoints.length === 0) {
+            vscode.window.showInformationMessage(
+                '🔍 未找到任何 API 端点\n\n请确保项目包含带有 @RestController 或 @Controller 注解的 Java 文件。', 
+                { modal: true }
+            );
+            return;
+        }
+        
+        // 计算控制器端点分布
+        const controllerEndpointCounts = new Map<string, number>();
+        endpoints.forEach(endpoint => {
+            const count = controllerEndpointCounts.get(endpoint.controllerClass) || 0;
+            controllerEndpointCounts.set(endpoint.controllerClass, count + 1);
+        });
+        
+        const endpointCounts = Array.from(controllerEndpointCounts.values());
+        const avgEndpointsPerController = endpointCounts.length > 0 
+            ? (endpointCounts.reduce((a, b) => a + b, 0) / endpointCounts.length).toFixed(1)
+            : '0';
+        
+        // 控制器排行榜
+        const controllerRanking = Array.from(controllerEndpointCounts.entries())
+            .map(([name, count]) => ({
+                name: name.split('.').pop() || name, // 只显示类名
+                fullName: name,
+                count
+            }))
+            .sort((a, b) => b.count - a.count);
+        
+        // 统计路径模式（分析前缀）
+        const pathPatterns = new Map<string, number>();
+        endpoints.forEach(endpoint => {
+            const parts = endpoint.path.split('/').filter(p => p && !p.startsWith('{') && !p.match(/^\d+$/));
+            parts.forEach(part => {
+                const count = pathPatterns.get(part) || 0;
+                pathPatterns.set(part, count + 1);
+            });
+        });
+        
+        const topPatterns = Array.from(pathPatterns.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3);
+
+        // 分析端点复杂度
+        const paramEndpoints = endpoints.filter(ep => ep.path.includes('{')).length;
+        const staticEndpoints = endpoints.length - paramEndpoints;
+        
+        // 分析最复杂的端点
+        const complexEndpoints = endpoints
+            .map(ep => ({
+                ...ep,
+                complexity: ep.path.split('/').length - 1,
+                hasParams: ep.path.includes('{')
+            }))
+            .sort((a, b) => b.complexity - a.complexity)
+            .slice(0, 2);
+
+        // 构建简洁易读的统计报告
+        const formatSection = (title: string, data: Array<[string, string]>) => {
+            const lines = [
+                `${title}`
+            ];
+            
+            data.forEach(([label, value]) => {
+                lines.push(`  ${label}: ${value}`);
+            });
+            
+            return lines;
+        };
+
+        // 总体概况
+        const overviewData: Array<[string, string]> = [
+            ['总端点数量', `${stats.totalEndpoints} 个`],
+            ['控制器数量', `${stats.controllerCount} 个`],
+            ['平均端点密度', `${avgEndpointsPerController} 个/控制器`],
+            ['参数化端点', `${paramEndpoints} 个 (${Math.round(paramEndpoints / stats.totalEndpoints * 100)}%)`],
+            ['静态端点', `${staticEndpoints} 个 (${Math.round(staticEndpoints / stats.totalEndpoints * 100)}%)`]
         ];
 
+        // HTTP方法分布
+        const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as const;
+        const methodData: Array<[string, string]> = methods.map(method => {
+            const count = stats.methodCounts[method as keyof typeof stats.methodCounts] || 0;
+            const percentage = ((count / stats.totalEndpoints) * 100).toFixed(1);
+            return [`${method}`, `${count} 个 (${percentage}%)`];
+        });
+
+        // 控制器排行榜
+        const controllerData: Array<[string, string]> = controllerRanking.slice(0, 5).map((ctrl, index) => {
+            const medals = ['🥇', '🥈', '🥉', '🏅', '⭐'];
+            const medal = medals[index] || '📌';
+            const name = ctrl.name.length > 18 ? ctrl.name.substring(0, 15) + '...' : ctrl.name;
+            return [`${medal} ${name}`, `${ctrl.count} 个端点`];
+        });
+
+        // 路径前缀
+        const pathData: Array<[string, string]> = topPatterns.slice(0, 3).map(([pattern, count], index) => {
+            const icons = ['🔥', '⭐', '💫'];
+            const icon = icons[index] || '📌';
+            return [`${icon} /${pattern}`, `${count} 个端点`];
+        });
+
+        let reportContent = [
+            `📊 API Navigator 统计报告`,
+            ``,
+            ...formatSection(`📈 总体概况`, overviewData),
+            ``,
+            ...formatSection(`🔗 HTTP 方法分布`, methodData),
+        ];
+
+        if (controllerData.length > 0) {
+            reportContent.push(
+                ``,
+                ...formatSection(`🏛️ 控制器排行榜`, controllerData)
+            );
+        }
+
+        if (pathData.length > 0) {
+            reportContent.push(
+                ``,
+                ...formatSection(`🛤️ 热门路径前缀`, pathData)
+            );
+        }
+
+        reportContent.push(
+            ``,
+            `📋 快速操作提示`,
+            `  CMD+\\ 快速搜索端点`,
+            `  点击端点直接跳转代码`,
+            `  搜索框支持路径、方法名过滤`,
+            ``,
+            `🔄 统计时间: ${new Date().toLocaleString('zh-CN')}`
+        );
+
         vscode.window.showInformationMessage(
-            items.join('\n'),
+            reportContent.join('\n'),
             { modal: true }
         );
     }

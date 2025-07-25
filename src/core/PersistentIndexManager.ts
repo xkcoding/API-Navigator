@@ -146,7 +146,8 @@ export class PersistentIndexManager {
     private async startBackgroundRefresh(): Promise<void> {
         // 短暂延迟后开始后台检查，避免阻塞用户操作
         setTimeout(() => {
-            this.detectAndUpdateChanges().catch(error => {
+            // 使用静默模式进行后台变更检测，不显示通知
+            this.detectAndUpdateChanges(true).catch(error => {
                 console.error('后台刷新失败:', error);
             });
         }, 1000);
@@ -155,13 +156,15 @@ export class PersistentIndexManager {
     /**
      * 检测变更并更新缓存
      */
-    public async detectAndUpdateChanges(): Promise<void> {
+    public async detectAndUpdateChanges(silentMode = false): Promise<void> {
         if (!this.currentCacheData) {
             console.log('没有缓存数据，跳过变更检测');
             return;
         }
 
-        this.emitStatus(CacheStatus.REFRESHING, '正在检查文件变更...');
+        if (!silentMode) {
+            this.emitStatus(CacheStatus.REFRESHING, '正在检查文件变更...');
+        }
         
         const startTime = Date.now();
         
@@ -179,7 +182,9 @@ export class PersistentIndexManager {
             console.log(stats.summary);
 
             if (stats.totalChanges === 0) {
-                this.emitStatus(CacheStatus.NO_CHANGES, '未发现变更');
+                if (!silentMode) {
+                    this.emitStatus(CacheStatus.NO_CHANGES, '未发现变更');
+                }
                 return;
             }
 
@@ -188,19 +193,27 @@ export class PersistentIndexManager {
             
             this.performanceMetrics.lastRefreshTime = Date.now() - startTime;
             
-            this.emitStatus(
-                CacheStatus.UPDATED, 
-                `发现 ${stats.totalChanges} 个变更 (${this.performanceMetrics.lastRefreshTime}ms)`,
-                currentFiles.length,
-                currentFiles.length,
-                changes.added.length,
-                changes.modified.length,
-                changes.deleted.length
-            );
+            if (!silentMode) {
+                this.emitStatus(
+                    CacheStatus.UPDATED, 
+                    `发现 ${stats.totalChanges} 个变更 (${this.performanceMetrics.lastRefreshTime}ms)`,
+                    currentFiles.length,
+                    currentFiles.length,
+                    changes.added.length,
+                    changes.modified.length,
+                    changes.deleted.length
+                );
+            } else {
+                // 静默模式下只更新状态，不显示通知
+                console.log(`后台检测到 ${stats.totalChanges} 个变更 (${this.performanceMetrics.lastRefreshTime}ms)`);
+                this.emitStatus(CacheStatus.UPDATED, '', currentFiles.length, currentFiles.length, changes.added.length, changes.modified.length, changes.deleted.length);
+            }
 
         } catch (error) {
             console.error('变更检测失败:', error);
-            this.emitStatus(CacheStatus.ERROR, '变更检测失败');
+            if (!silentMode) {
+                this.emitStatus(CacheStatus.ERROR, '变更检测失败');
+            }
         }
     }
 

@@ -1,7 +1,7 @@
 {
   "name": "xkcoding-api-navigator",
   "displayName": "API Navigator for Spring Boot",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Navigate and manage REST APIs in Java SpringBoot projects",
   "icon": "images/icon.png",
   "categories": [
@@ -37,8 +37,9 @@
     "views": {
       "apiNavigator": [
         {
-          "id": "apiNavigatorView",
-          "name": "API Endpoints"
+          "id": "apiNavigatorWebView",
+          "name": "API Navigator",
+          "type": "webview"
         }
       ]
     },
@@ -50,7 +51,7 @@
       },
       {
         "command": "apiNavigator.search",
-        "title": "Search APIs",
+        "title": "Quick Search (CMD+\\)",
         "icon": "$(search)"
       },
       {
@@ -63,13 +64,28 @@
       },
       {
         "command": "apiNavigator.searchInPanel",
-        "title": "Search in Panel",
-        "icon": "$(search)"
+        "title": "Search in Sidebar",
+        "icon": "$(filter)"
       },
       {
         "command": "apiNavigator.clearPanelSearch",
         "title": "Clear Search",
-        "icon": "$(clear-all)"
+        "icon": "$(close)"
+      },
+      {
+        "command": "apiNavigator.startSearch",
+        "title": "Start Search",
+        "icon": "$(search)"
+      },
+      {
+        "command": "apiNavigator.editSearch",
+        "title": "Edit Search",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "apiNavigator.showStatistics",
+        "title": "Show Statistics",
+        "icon": "$(graph)"
       }
     ],
     "keybindings": [
@@ -77,33 +93,26 @@
         "command": "apiNavigator.search",
         "key": "cmd+\\",
         "mac": "cmd+\\",
-        "when": "workspaceHasJavaFiles"
+        "win": "ctrl+\\",
+        "linux": "ctrl+\\"
+      },
+      {
+        "command": "apiNavigator.clearPanelSearch",
+        "key": "cmd+shift+\\",
+        "mac": "cmd+shift+\\",
+        "win": "ctrl+shift+\\",
+        "linux": "ctrl+shift+\\"
       }
     ],
     "menus": {
-      "view/title": [
-        {
-          "command": "apiNavigator.refresh",
-          "when": "view == apiNavigatorView",
-          "group": "navigation"
-        },
-        {
-          "command": "apiNavigator.search",
-          "when": "view == apiNavigatorView",
-          "group": "navigation"
-        },
-        {
-          "command": "apiNavigator.searchInPanel",
-          "when": "view == apiNavigatorView",
-          "group": "navigation"
-        },
-        {
-          "command": "apiNavigator.clearPanelSearch",
-          "when": "view == apiNavigatorView",
-          "group": "navigation"
-        }
-      ]
+      "view/title": []
+    },
+    "viewsWelcome": [
+      {
+        "view": "apiNavigatorView",
+        "contents": "没有找到Spring Boot API端点\n\n请确保当前项目：\n• 包含Java源文件\n• 使用Spring Boot框架\n• 有@RestController或@Controller注解\n\n[刷新](command:apiNavigator.refresh)\n\n[查看文档](https://github.com/xkcoding/API-Navigator)"
     }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

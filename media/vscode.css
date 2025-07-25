@@ -1,0 +1,108 @@
+/* VSCode Theme Variables and Base Styles */
+body {
+	font-family: var(--vscode-font-family);
+	font-weight: var(--vscode-font-weight);
+	font-size: var(--vscode-font-size);
+	color: var(--vscode-foreground);
+	background-color: var(--vscode-sideBar-background);
+	line-height: 1.4;
+	overflow: hidden;
+}
+
+/* Input styles matching VSCode theme */
+input[type="text"] {
+	background-color: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-input-border);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+}
+
+input[type="text"]:focus {
+	border-color: var(--vscode-focusBorder);
+	outline: none;
+}
+
+input[type="text"]::placeholder {
+	color: var(--vscode-input-placeholderForeground);
+}
+
+/* Button styles matching VSCode theme */
+button {
+	background-color: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border: none;
+	cursor: pointer;
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+}
+
+button:hover {
+	background-color: var(--vscode-button-hoverBackground);
+}
+
+button:active {
+	background-color: var(--vscode-button-background);
+}
+
+/* List styles matching VSCode theme */
+.list-item {
+	color: var(--vscode-list-foreground);
+	background-color: var(--vscode-list-background);
+}
+
+.list-item:hover {
+	background-color: var(--vscode-list-hoverBackground);
+}
+
+.list-item:focus,
+.list-item.selected {
+	background-color: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+	width: var(--vscode-scrollbarSlider-background);
+}
+
+::-webkit-scrollbar-track {
+	background: var(--vscode-scrollbar-shadow);
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--vscode-scrollbarSlider-background);
+	border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--vscode-scrollbarSlider-hoverBackground);
+}
+
+/* Border styles */
+.border {
+	border-color: var(--vscode-sideBar-border);
+}
+
+.divider {
+	background-color: var(--vscode-sideBar-border);
+}
+
+/* Text styles */
+.text-muted {
+	color: var(--vscode-descriptionForeground);
+}
+
+.text-accent {
+	color: var(--vscode-textLink-foreground);
+}
+
+/* Icon styles */
+.icon {
+	color: var(--vscode-icon-foreground);
+}
+
+/* Error styles */
+.error {
+	color: var(--vscode-errorForeground);
+} 

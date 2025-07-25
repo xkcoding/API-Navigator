@@ -7,7 +7,7 @@ import { IconConfig } from './IconConfig';
 interface TreeNode {
     id: string;
     label: string;
-    type: 'controller' | 'endpoint' | 'loading' | 'loadMore';
+    type: 'controller' | 'endpoint' | 'loading' | 'loadMore' | 'searchState';
     endpoint?: ApiEndpoint;
     children?: TreeNode[];
     metadata?: {
@@ -17,6 +17,9 @@ interface TreeNode {
         batchSize?: number;
         cacheStatus?: CacheStatus;
         cacheMessage?: string;
+        action?: string; // 新增：用于搜索状态节点
+        query?: string; // 新增：用于搜索状态节点
+        resultCount?: number; // 新增：用于搜索状态节点
     };
 }
 
@@ -35,6 +38,10 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
     private controllerLoadState = new Map<string, number>(); // 记录每个级别已加载的数量
     private endpointLoadState = new Map<string, number>();   // 记录每个控制器已加载的端点数量
     private loadingStates = new Map<string, boolean>();      // 记录正在加载的状态
+
+    // 刷新状态管理
+    private isRefreshing = false;
+    private pendingTimeouts = new Set<NodeJS.Timeout>();     // 跟踪待处理的定时器
 
     // 搜索状态
     private searchQuery: string = '';
@@ -172,10 +179,29 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
      * 刷新树视图
      */
     public refresh(): void {
+        // 防止并发刷新
+        if (this.isRefreshing) {
+            return;
+        }
+
+        this.isRefreshing = true;
+
+        // 清除所有待处理的定时器
+        this.pendingTimeouts.forEach(timeout => clearTimeout(timeout));
+        this.pendingTimeouts.clear();
+
         // 重置分批加载状态
         this.controllerLoadState.clear();
         this.endpointLoadState.clear();
+        this.loadingStates.clear();
+
+        // 触发树视图刷新
         this._onDidChangeTreeData.fire();
+
+        // 重置刷新状态
+        setTimeout(() => {
+            this.isRefreshing = false;
+        }, 100);
     }
 
     /**
@@ -207,7 +233,7 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
      * 自动异步加载更多控制器
      */
     private async autoLoadMoreControllers(): Promise<void> {
-        if (this.loadingStates.get('controllers')) return; // 防止重复加载
+        if (this.loadingStates.get('controllers') || this.isRefreshing) return; // 防止重复加载或在刷新时加载
         
         this.loadingStates.set('controllers', true);
         const currentLoaded = this.controllerLoadState.get('root') || this.INITIAL_CONTROLLER_BATCH;
@@ -215,16 +241,29 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
         
         if (currentLoaded < controllerClasses.length) {
             // 延迟加载，给用户更好的体验
-            setTimeout(() => {
+            const timeout = setTimeout(() => {
+                // 从待处理定时器集合中移除
+                this.pendingTimeouts.delete(timeout);
+                
+                // 检查是否在刷新中，如果是则跳过
+                if (this.isRefreshing) {
+                    this.loadingStates.set('controllers', false);
+                    return;
+                }
+
                 this.controllerLoadState.set('root', currentLoaded + this.CONTROLLER_BATCH_SIZE);
                 this.loadingStates.set('controllers', false);
                 this._onDidChangeTreeData.fire();
                 
                 // 如果还有更多数据，继续自动加载
                 if (this.controllerLoadState.get('root')! < controllerClasses.length) {
-                    setTimeout(() => this.autoLoadMoreControllers(), this.AUTO_LOAD_DELAY);
+                    const nextTimeout = setTimeout(() => this.autoLoadMoreControllers(), this.AUTO_LOAD_DELAY);
+                    this.pendingTimeouts.add(nextTimeout);
                 }
             }, this.AUTO_LOAD_DELAY);
+            
+            // 跟踪这个定时器
+            this.pendingTimeouts.add(timeout);
         } else {
             this.loadingStates.set('controllers', false);
         }
@@ -235,23 +274,36 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
      */
     private async autoLoadMoreEndpoints(controllerClass: string): Promise<void> {
         const loadingKey = `endpoints-${controllerClass}`;
-        if (this.loadingStates.get(loadingKey)) return; // 防止重复加载
+        if (this.loadingStates.get(loadingKey) || this.isRefreshing) return; // 防止重复加载或在刷新时加载
         
         this.loadingStates.set(loadingKey, true);
         const currentLoaded = this.endpointLoadState.get(controllerClass) || this.INITIAL_ENDPOINT_BATCH;
         const endpoints = this.apiIndexer.findByController(controllerClass);
         
         if (currentLoaded < endpoints.length) {
-            setTimeout(() => {
+            const timeout = setTimeout(() => {
+                // 从待处理定时器集合中移除
+                this.pendingTimeouts.delete(timeout);
+                
+                // 检查是否在刷新中，如果是则跳过
+                if (this.isRefreshing) {
+                    this.loadingStates.set(loadingKey, false);
+                    return;
+                }
+
                 this.endpointLoadState.set(controllerClass, currentLoaded + this.ENDPOINT_BATCH_SIZE);
                 this.loadingStates.set(loadingKey, false);
                 this._onDidChangeTreeData.fire();
                 
                 // 如果还有更多数据，继续自动加载
                 if (this.endpointLoadState.get(controllerClass)! < endpoints.length) {
-                    setTimeout(() => this.autoLoadMoreEndpoints(controllerClass), this.AUTO_LOAD_DELAY);
+                    const nextTimeout = setTimeout(() => this.autoLoadMoreEndpoints(controllerClass), this.AUTO_LOAD_DELAY);
+                    this.pendingTimeouts.add(nextTimeout);
                 }
             }, this.AUTO_LOAD_DELAY);
+            
+            // 跟踪这个定时器
+            this.pendingTimeouts.add(timeout);
         } else {
             this.loadingStates.set(loadingKey, false);
         }
@@ -261,22 +313,35 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
      * 自动异步加载更多搜索结果
      */
     private async autoLoadMoreSearchResults(): Promise<void> {
-        if (this.loadingStates.get('search')) return; // 防止重复加载
+        if (this.loadingStates.get('search') || this.isRefreshing) return; // 防止重复加载或在刷新时加载
         
         this.loadingStates.set('search', true);
         const currentLoaded = this.endpointLoadState.get('search') || this.INITIAL_ENDPOINT_BATCH;
         
         if (currentLoaded < this.filteredEndpoints.length) {
-            setTimeout(() => {
+            const timeout = setTimeout(() => {
+                // 从待处理定时器集合中移除
+                this.pendingTimeouts.delete(timeout);
+                
+                // 检查是否在刷新中，如果是则跳过
+                if (this.isRefreshing) {
+                    this.loadingStates.set('search', false);
+                    return;
+                }
+
                 this.endpointLoadState.set('search', currentLoaded + this.ENDPOINT_BATCH_SIZE);
                 this.loadingStates.set('search', false);
                 this._onDidChangeTreeData.fire();
                 
                 // 如果还有更多数据，继续自动加载
                 if (this.endpointLoadState.get('search')! < this.filteredEndpoints.length) {
-                    setTimeout(() => this.autoLoadMoreSearchResults(), this.AUTO_LOAD_DELAY);
+                    const nextTimeout = setTimeout(() => this.autoLoadMoreSearchResults(), this.AUTO_LOAD_DELAY);
+                    this.pendingTimeouts.add(nextTimeout);
                 }
             }, this.AUTO_LOAD_DELAY);
+            
+            // 跟踪这个定时器
+            this.pendingTimeouts.add(timeout);
         } else {
             this.loadingStates.set('search', false);
         }
@@ -389,6 +454,87 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
             item.tooltip = '正在加载...';
             item.contextValue = 'loading';
             return item;
+        } else if (element.type === 'endpoint' && !element.endpoint) {
+            // 空状态节点：为友好提示设置合适的图标和样式
+            const item = new vscode.TreeItem(
+                element.label,
+                vscode.TreeItemCollapsibleState.None
+            );
+            
+            // 根据节点ID设置不同的图标
+            if (element.id.includes('welcome')) {
+                item.iconPath = new vscode.ThemeIcon('star');
+                item.tooltip = '欢迎使用API Navigator';
+            } else if (element.id.includes('guide-1')) {
+                item.iconPath = new vscode.ThemeIcon('folder');
+                item.tooltip = '确保项目包含Java源文件';
+            } else if (element.id.includes('guide-2')) {
+                item.iconPath = new vscode.ThemeIcon('search');
+                item.tooltip = '检查Spring Boot注解';
+            } else if (element.id.includes('refresh')) {
+                item.iconPath = new vscode.ThemeIcon('refresh');
+                item.tooltip = '重新扫描项目';
+                // 为刷新节点添加点击命令
+                item.command = {
+                    command: 'apiNavigator.refresh',
+                    title: 'Refresh',
+                    arguments: []
+                };
+            }
+            
+            item.contextValue = 'emptyState';
+            return item;
+        } else if (element.type === 'searchState') {
+            const item = new vscode.TreeItem(
+                element.label,
+                vscode.TreeItemCollapsibleState.None
+            );
+            
+            // 根据不同的action设置不同的图标和行为
+            const action = element.metadata?.action;
+            switch (action) {
+                case 'current':
+                    item.iconPath = new vscode.ThemeIcon('search');
+                    item.tooltip = `搜索结果: ${element.metadata?.resultCount || 0} 个匹配项`;
+                    break;
+                case 'edit':
+                    item.iconPath = new vscode.ThemeIcon('edit');
+                    item.tooltip = '点击编辑搜索条件';
+                    item.command = {
+                        command: 'apiNavigator.editSearch',
+                        title: 'Edit Search',
+                        arguments: [element]
+                    };
+                    break;
+                case 'clear':
+                    item.iconPath = new vscode.ThemeIcon('close');
+                    item.tooltip = '点击清除搜索，显示全部内容';
+                    item.command = {
+                        command: 'apiNavigator.clearPanelSearch',
+                        title: 'Clear Search',
+                        arguments: []
+                    };
+                    break;
+                case 'start':
+                    item.iconPath = new vscode.ThemeIcon('search');
+                    item.tooltip = '点击开始搜索API端点';
+                    item.command = {
+                        command: 'apiNavigator.startSearch',
+                        title: 'Start Search',
+                        arguments: [element]
+                    };
+                    break;
+                case 'separator':
+                    item.iconPath = new vscode.ThemeIcon('dash');
+                    item.tooltip = '';
+                    break;
+                default:
+                    item.iconPath = new vscode.ThemeIcon('search');
+                    break;
+            }
+            
+            item.contextValue = 'searchState';
+            return item;
         }
 
         return new vscode.TreeItem('Unknown');
@@ -402,6 +548,9 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
             // 根级别：显示主要内容
             const nodes: TreeNode[] = [];
             
+            // 添加搜索状态节点
+            nodes.push(...this.getSearchStateNodes());
+
             if (this.isSearchMode()) {
                 // 搜索模式：添加搜索结果
                 nodes.push(...this.getSearchResultNodes());
@@ -424,7 +573,21 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
      */
     private getControllerNodes(): TreeNode[] {
         const controllerClasses = this.apiIndexer.getAllControllerClasses();
+        
+        // 按字母顺序排序控制器类名
+        controllerClasses.sort((a, b) => {
+            // 比较类名（不包含包名）
+            const classNameA = a.split('.').pop() || a;
+            const classNameB = b.split('.').pop() || b;
+            return classNameA.localeCompare(classNameB);
+        });
+        
         const totalCount = controllerClasses.length;
+        
+        // 空状态处理：当没有找到API控制器时显示友好提示
+        if (totalCount === 0) {
+            return this.getEmptyStateNodes();
+        }
         
         // 获取已加载的控制器数量，首次加载显示初始批次
         let loadedCount = this.controllerLoadState.get('root');
@@ -457,6 +620,42 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
         }
         
         return nodes;
+    }
+
+    /**
+     * 获取空状态节点 - 当没有找到API端点时显示友好提示
+     */
+    private getEmptyStateNodes(): TreeNode[] {
+        return [
+            {
+                id: 'empty-state-welcome',
+                label: '🚀 欢迎使用 API Navigator',
+                type: 'endpoint',
+                endpoint: undefined,
+                metadata: {
+                    cacheStatus: this.currentCacheStatus,
+                    cacheMessage: '当前项目中未找到Spring Boot API端点'
+                }
+            },
+            {
+                id: 'empty-state-guide-1',
+                label: '📁 请确保项目包含Java Spring Boot源文件',
+                type: 'endpoint',
+                endpoint: undefined
+            },
+            {
+                id: 'empty-state-guide-2',
+                label: '🔍 检查是否有@RestController或@Controller注解',
+                type: 'endpoint',
+                endpoint: undefined
+            },
+            {
+                id: 'empty-state-refresh',
+                label: '♻️ 点击刷新按钮重新扫描项目',
+                type: 'endpoint',
+                endpoint: undefined
+            }
+        ];
     }
 
     /**
@@ -547,6 +746,61 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
                     totalCount,
                     batchSize: this.ENDPOINT_BATCH_SIZE
                 }
+            });
+        }
+        
+        return nodes;
+    }
+
+    /**
+     * 获取搜索状态节点（显示在TreeView顶部）
+     */
+    private getSearchStateNodes(): TreeNode[] {
+        const nodes: TreeNode[] = [];
+        
+        if (this.searchQuery) {
+            // 显示当前搜索状态
+            nodes.push({
+                id: 'search-current',
+                label: `🔍 搜索: "${this.searchQuery}"`,
+                type: 'searchState',
+                metadata: { 
+                    action: 'current',
+                    query: this.searchQuery,
+                    resultCount: this.filteredEndpoints.length
+                }
+            });
+            
+            // 编辑搜索
+            nodes.push({
+                id: 'search-edit',
+                label: `✏️ 编辑搜索条件`,
+                type: 'searchState',
+                metadata: { action: 'edit' }
+            });
+            
+            // 清除搜索
+            nodes.push({
+                id: 'search-clear',
+                label: `❌ 清除搜索 (显示全部)`,
+                type: 'searchState',
+                metadata: { action: 'clear' }
+            });
+            
+            // 分隔线
+            nodes.push({
+                id: 'search-separator',
+                label: `────────────────────────`,
+                type: 'searchState',
+                metadata: { action: 'separator' }
+            });
+        } else {
+            // 未搜索状态 - 显示搜索入口
+            nodes.push({
+                id: 'search-start',
+                label: `🔍 点击开始搜索 API 端点`,
+                type: 'searchState',
+                metadata: { action: 'start' }
             });
         }
         
@@ -725,10 +979,12 @@ export class ApiNavigatorProvider implements vscode.TreeDataProvider<TreeNode> {
         }
 
         try {
-            vscode.window.showInformationMessage('正在手动刷新缓存...');
+            // 显示开始刷新的消息
+            vscode.window.setStatusBarMessage('🔄 正在重新索引API端点...', 2000);
             await this.cacheManager.manualRefresh();
+            // 完成消息会由缓存管理器的状态监听器自动显示
         } catch (error) {
-            vscode.window.showErrorMessage(`手动刷新失败: ${error}`);
+            vscode.window.showErrorMessage(`重新索引失败: ${error}`);
         }
     }
 

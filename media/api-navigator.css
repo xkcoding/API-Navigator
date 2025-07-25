@@ -1,0 +1,392 @@
+/* API Navigator Custom Styles */
+
+.api-navigator-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--vscode-sideBar-background);
+}
+
+/* 搜索区域样式 */
+.search-container {
+    padding: 8px;
+    border-bottom: 1px solid var(--vscode-sideBar-border);
+    background-color: var(--vscode-sideBar-background);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.search-header {
+    display: flex;
+    align-items: center;
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    gap: 6px;
+}
+
+.search-header:focus-within {
+    border-color: var(--vscode-focusBorder);
+}
+
+.search-icon {
+    font-size: 14px;
+    color: var(--vscode-icon-foreground);
+    opacity: 0.8;
+}
+
+.search-input {
+    flex: 1;
+    background: transparent;
+    color: var(--vscode-input-foreground);
+    font-size: 13px;
+    line-height: 18px;
+    padding: 2px 0;
+}
+
+.search-input::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+    font-style: italic;
+}
+
+.clear-btn {
+    background: transparent;
+    color: var(--vscode-icon-foreground);
+    font-size: 12px;
+    padding: 2px 4px;
+    border-radius: 2px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.clear-btn:hover {
+    opacity: 1;
+    background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.search-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.toolbar-buttons {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.toolbar-btn {
+    background: transparent;
+    color: var(--vscode-icon-foreground);
+    font-size: 16px;
+    padding: 6px 8px;
+    border-radius: 3px;
+    opacity: 0.7;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    min-height: 28px;
+}
+
+.toolbar-btn:hover {
+    opacity: 1;
+    background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.toolbar-btn:active {
+    background-color: var(--vscode-toolbar-activeBackground);
+    transform: scale(0.95);
+}
+
+.btn-icon {
+    font-size: 14px;
+    line-height: 1;
+}
+
+/* 特殊状态样式 */
+.toolbar-btn.active {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    opacity: 1;
+}
+
+.toolbar-btn.loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.toolbar-btn.loading .btn-icon {
+    animation: spin 1s linear infinite;
+}
+
+.refresh-btn {
+    background: transparent;
+    color: var(--vscode-icon-foreground);
+    font-size: 14px;
+    padding: 2px 4px;
+    border-radius: 2px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.refresh-btn:hover {
+    opacity: 1;
+    background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+/* 结果区域样式 */
+.results-container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.loading-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 20px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 13px;
+}
+
+.loading-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* 空状态样式 */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    min-height: 200px;
+}
+
+.empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.6;
+}
+
+.empty-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    margin-bottom: 8px;
+}
+
+.empty-desc {
+    font-size: 13px;
+    color: var(--vscode-descriptionForeground);
+    line-height: 1.4;
+    max-width: 250px;
+}
+
+/* 结果列表样式 */
+.results-section {
+    height: 100%;
+    overflow-y: auto;
+}
+
+.results-list {
+    padding: 4px 0;
+}
+
+/* 端点项样式 */
+.endpoint-item {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 12px; /* 减少垂直内边距 */
+    cursor: pointer;
+    border-radius: 4px;
+    margin: 1px 4px;
+    transition: background-color 0.1s;
+}
+
+.endpoint-item:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.endpoint-item:active {
+    background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+.endpoint-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px; /* 减少底部间距 */
+    min-width: 0; /* 允许flex子元素收缩 */
+}
+
+.http-method {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    min-width: 45px; /* 稍微增加宽度确保所有方法都能容纳 */
+    max-width: 45px; /* 设置最大宽度，防止过度扩展 */
+    text-align: center;
+    flex-shrink: 0; /* 防止收缩 */
+}
+
+.http-method.GET {
+    background-color: #28a745;
+    color: white;
+}
+
+.http-method.POST {
+    background-color: #007bff;
+    color: white;
+}
+
+.http-method.PUT {
+    background-color: #ffc107;
+    color: black;
+}
+
+.http-method.DELETE {
+    background-color: #dc3545;
+    color: white;
+}
+
+.http-method.PATCH {
+    background-color: #6f42c1;
+    color: white;
+}
+
+.endpoint-path {
+    font-family: var(--vscode-editor-font-family);
+    font-size: 13px;
+    color: var(--vscode-foreground);
+    font-weight: 500;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.endpoint-details {
+    margin-left: 61px; /* 与路径左对齐，增加一个空格的距离 (45px HTTP方法宽度 + 8px gap + 8px 额外空格) */
+    display: flex;
+    flex-direction: column;
+    gap: 1px; /* 减少间距，因为现在只有一行 */
+}
+
+.endpoint-method {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    font-family: var(--vscode-editor-font-family);
+    line-height: 1.3; /* 减少行高，使整体更紧凑 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 分组标题样式 */
+.controller-group {
+    margin-bottom: 8px;
+}
+
+.controller-header {
+    padding: 6px 12px;
+    background-color: var(--vscode-sideBar-background);
+    border-bottom: 1px solid var(--vscode-sideBar-border);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    cursor: pointer;
+    transition: background-color 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 1;
+    min-width: 0; /* 允许flex子元素收缩 */
+}
+
+.controller-header:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.controller-toggle {
+    font-size: 10px;
+    color: var(--vscode-icon-foreground);
+    transition: transform 0.2s;
+    user-select: none;
+}
+
+.controller-group.collapsed .controller-toggle {
+    transform: rotate(-90deg);
+}
+
+.controller-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.controller-count {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    margin-left: 8px;
+}
+
+.controller-endpoints {
+    transition: all 0.2s ease-out;
+    overflow: hidden;
+}
+
+.controller-group.collapsed .controller-endpoints {
+    max-height: 0;
+    opacity: 0;
+}
+
+/* 搜索高亮样式 */
+.search-highlight {
+    background-color: var(--vscode-editor-findMatchBackground);
+    color: var(--vscode-editor-findMatchForeground);
+    padding: 1px 2px;
+    border-radius: 2px;
+}
+
+/* 响应式设计 */
+@media (max-width: 300px) {
+    .search-header {
+        padding: 2px 6px;
+    }
+    
+    .endpoint-item {
+        padding: 6px 8px;
+    }
+    
+    .empty-state {
+        padding: 20px 12px;
+    }
+    
+    .empty-icon {
+        font-size: 36px;
+    }
+} 

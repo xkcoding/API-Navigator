@@ -391,15 +391,16 @@ export class ApiIndexer {
             }
         }
 
-        return results;
+        return this.sortEndpoints(results);
     }
 
     /**
      * 按 HTTP 方法过滤
      */
     public findByMethod(method: HttpMethod): ApiEndpoint[] {
-        return Array.from(this.endpoints.values())
+        const filtered = Array.from(this.endpoints.values())
             .filter(endpoint => endpoint.method === method);
+        return this.sortEndpoints(filtered);
     }
 
     /**
@@ -421,14 +422,39 @@ export class ApiIndexer {
             }
         }
 
-        return results;
+        return this.sortEndpoints(results);
     }
 
     /**
      * 获取所有端点
      */
     public getAllEndpoints(): ApiEndpoint[] {
-        return Array.from(this.endpoints.values());
+        return this.sortEndpoints(Array.from(this.endpoints.values()));
+    }
+
+    /**
+     * 排序端点 - 按控制器名，然后按HTTP方法，最后按路径
+     */
+    private sortEndpoints(endpoints: ApiEndpoint[]): ApiEndpoint[] {
+        return endpoints.sort((a, b) => {
+            // 1. 按控制器类名排序
+            const controllerA = a.controllerClass.toLowerCase();
+            const controllerB = b.controllerClass.toLowerCase();
+            if (controllerA !== controllerB) {
+                return controllerA.localeCompare(controllerB);
+            }
+
+            // 2. 按HTTP方法排序 (GET < POST < PUT < DELETE < PATCH)
+            const methodOrder = { 'GET': 1, 'POST': 2, 'PUT': 3, 'DELETE': 4, 'PATCH': 5 };
+            const orderA = methodOrder[a.method as keyof typeof methodOrder] || 999;
+            const orderB = methodOrder[b.method as keyof typeof methodOrder] || 999;
+            if (orderA !== orderB) {
+                return orderA - orderB;
+            }
+
+            // 3. 按路径排序
+            return a.path.localeCompare(b.path);
+        });
     }
 
     /**

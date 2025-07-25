@@ -31,16 +31,20 @@ jobs:
       - name: Package extension
         id: package
         run: |
-          PACKAGE_NAME=$(npx @vscode/vsce package --out xkcoding-api-navigator.vsix | grep "Packaged:" | awk '{print $2}' || echo "xkcoding-api-navigator.vsix")
-          echo "package_name=xkcoding-api-navigator.vsix" >> $GITHUB_OUTPUT
+          # 从 package.json 中读取版本号
+          VERSION=$(node -p "require('./package.json').version")
+          PACKAGE_NAME="xkcoding-api-navigator-v${VERSION}.vsix"
+          npx @vscode/vsce package --out "${PACKAGE_NAME}"
+          echo "package_name=${PACKAGE_NAME}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
       
       - name: Publish to VSCode Marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx @vscode/vsce publish --packagePath xkcoding-api-navigator.vsix
+        run: npx @vscode/vsce publish --packagePath ${{ steps.package.outputs.package_name }}
       
       - name: Upload VSIX to release
         run: |
-          gh release upload ${{ github.event.release.tag_name }} "xkcoding-api-navigator.vsix" --clobber
+          gh release upload ${{ github.event.release.tag_name }} "${{ steps.package.outputs.package_name }}" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

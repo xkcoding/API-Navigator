@@ -4,6 +4,7 @@ import { ApiIndexer } from './core/ApiIndexer';
 import { WorkerPool } from './core/WorkerPool';
 import { SearchProvider } from './ui/SearchProvider';
 import { PersistentIndexManager } from './core/PersistentIndexManager';
+import { ApiNavigatorWebView } from './ui/ApiNavigatorWebView';
 
 // 全局引用，用于deactivate清理
 let globalCacheManager: PersistentIndexManager | null = null;
@@ -24,13 +25,15 @@ export async function activate(context: vscode.ExtensionContext) {
     
     // 初始化UI组件，传入缓存管理器
     const apiNavigatorProvider = new ApiNavigatorProvider(apiIndexer, cacheManager);
-    const searchProvider = new SearchProvider(apiIndexer);
+    const searchProvider = new SearchProvider(apiIndexer, context.extensionUri);
 
-    // 注册侧边栏树视图
-    const treeView = vscode.window.createTreeView('apiNavigatorView', {
-        treeDataProvider: apiNavigatorProvider,
-        showCollapseAll: true
-    });
+    // TreeView已移除，现在只使用WebView
+
+    // 创建并注册WebView Provider
+    const webViewProvider = new ApiNavigatorWebView(context.extensionUri, apiIndexer);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(ApiNavigatorWebView.viewType, webViewProvider)
+    );
 
     // 注册命令
     const commands = [
@@ -39,6 +42,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
         
         vscode.commands.registerCommand('apiNavigator.search', () => {
+            // 保持原有的QuickPick搜索功能 (CMD+\ 快捷键)
             searchProvider.showQuickPick();
         }),
 
@@ -48,25 +52,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
         }),
 
-        vscode.commands.registerCommand('apiNavigator.loadMore', (node) => {
-            apiNavigatorProvider.loadMore(node);
-        }),
 
-        vscode.commands.registerCommand('apiNavigator.searchInPanel', async () => {
-            const query = await vscode.window.showInputBox({
-                prompt: '请输入搜索关键字（路径、控制器、方法名或HTTP方法）',
-                placeHolder: '例如：/api/user、UserController、GET',
-                value: apiNavigatorProvider.getSearchQuery()
-            });
-            
-            if (query !== undefined) {
-                apiNavigatorProvider.setSearchQuery(query);
-            }
-        }),
-
-        vscode.commands.registerCommand('apiNavigator.clearPanelSearch', () => {
-            apiNavigatorProvider.clearSearch();
-        }),
 
         // 缓存管理命令
         vscode.commands.registerCommand('apiNavigator.clearCache', () => {
@@ -79,11 +65,16 @@ export async function activate(context: vscode.ExtensionContext) {
 
         vscode.commands.registerCommand('apiNavigator.refreshCache', () => {
             apiNavigatorProvider.manualRefreshCommand();
+        }),
+
+        // 统计信息命令
+        vscode.commands.registerCommand('apiNavigator.showStatistics', () => {
+            searchProvider.showStatistics();
         })
     ];
 
     // 添加到上下文
-    context.subscriptions.push(treeView, ...commands);
+    context.subscriptions.push(...commands);
 
     // 初始化索引（使用缓存）
     try {
