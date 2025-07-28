@@ -182,6 +182,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # 获取完整的git历史，包括tags
+          # 确保获取所有 refs，包括 annotated tag 对象
+          ref: ${{ github.ref }}
       
       - name: Download VSIX artifact
         uses: actions/download-artifact@v4
@@ -209,9 +211,25 @@ jobs:
               # 获取 Tag annotation 作为 Release Notes（修复逻辑）
               echo "🔍 获取 Tag ${TAG_NAME} 的 annotation..."
               
-              # 首先检查这是否是一个 annotated tag
+              # 确保 tag 对象已正确获取
+              echo "🔄 刷新远程 tags..."
+              git fetch origin --tags --force
+              
+              # 验证 tag 是否存在
+              if ! git tag -l | grep -q "^${TAG_NAME}$"; then
+                echo "❌ Tag ${TAG_NAME} 在本地不存在，尝试重新获取..."
+                git fetch origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}"
+              fi
+              
+              # 检查这是否是一个 annotated tag
               TAG_TYPE=$(git cat-file -t "${TAG_NAME}" 2>/dev/null || echo "")
               echo "🏷️ Tag ${TAG_NAME} 类型: ${TAG_TYPE}"
+              
+              # 额外调试信息
+              echo "🔍 调试信息:"
+              echo "   - 当前 git ref: $(git rev-parse HEAD)"
+              echo "   - Tag ${TAG_NAME} 指向: $(git rev-parse "${TAG_NAME}^{}" 2>/dev/null || echo "无法解析")"
+              echo "   - Tag 对象哈希: $(git rev-parse "${TAG_NAME}" 2>/dev/null || echo "无法解析")"
               
               TAG_MESSAGE=""
               
@@ -220,10 +238,19 @@ jobs:
                 echo "📝 检测到 Annotated Tag，获取 tag message..."
                 TAG_MESSAGE=$(git tag -l --format='%(contents)' "${TAG_NAME}" 2>/dev/null || echo "")
                 
+                echo "🔍 方法1获取结果 - 长度: ${#TAG_MESSAGE} 字符"
+                if [ ${#TAG_MESSAGE} -gt 0 ]; then
+                  echo "📄 方法1内容预览 (前50字符): '$(echo "$TAG_MESSAGE" | head -c 50)'"
+                fi
+                
                 # 如果上面的方法失败，尝试使用 git cat-file
                 if [ -z "$TAG_MESSAGE" ]; then
                   echo "🔄 尝试备用方法获取 annotated tag message..."
                   TAG_MESSAGE=$(git cat-file -p "${TAG_NAME}" 2>/dev/null | sed '1,/^$/d' || echo "")
+                  echo "🔍 方法2获取结果 - 长度: ${#TAG_MESSAGE} 字符"
+                  if [ ${#TAG_MESSAGE} -gt 0 ]; then
+                    echo "📄 方法2内容预览 (前50字符): '$(echo "$TAG_MESSAGE" | head -c 50)'"
+                  fi
                 fi
               else
                 # 这是一个 lightweight tag，没有独立的 tag message
@@ -232,7 +259,14 @@ jobs:
               fi
               
               # 检查是否成功获取到有意义的内容
+              echo "🔬 开始验证 TAG_MESSAGE 有效性..."
+              echo "   - TAG_MESSAGE 长度: ${#TAG_MESSAGE}"
+              echo "   - 是否非空: $([ -n "$TAG_MESSAGE" ] && echo "是" || echo "否")"
+              echo "   - 是否不等于空字符串: $([ "$TAG_MESSAGE" != "" ] && echo "是" || echo "否")"
+              echo "   - 是否不等于标签名: $([ "$TAG_MESSAGE" != "$TAG_NAME" ] && echo "是" || echo "否")"
+              
               if [ -n "$TAG_MESSAGE" ] && [ "$TAG_MESSAGE" != "" ] && [ "$TAG_MESSAGE" != "$TAG_NAME" ]; then
+                echo "✅ TAG_MESSAGE 验证通过，使用 annotation 作为 Release Notes"
                 echo "📝 成功获取 Tag annotation，长度: ${#TAG_MESSAGE} 字符"
                 echo "📄 Release Notes 预览 (前100字符):"
                 echo "$TAG_MESSAGE" | head -c 100
@@ -249,10 +283,14 @@ jobs:
                   --notes-file "$NOTES_FILE"
               else
                 # 根据 tag 类型显示不同的提示信息
+                echo "❌ TAG_MESSAGE 验证失败，使用默认 Release Notes"
                 if [ "$TAG_TYPE" = "tag" ]; then
-                  echo "⚠️ 无法获取 Annotated Tag 的 annotation 内容，使用默认 Release Notes"
+                  echo "⚠️ Annotated Tag annotation 内容无效，可能的原因："
+                  echo "   - annotation 内容为空"
+                  echo "   - annotation 内容等于标签名称"
+                  echo "   - git 命令执行失败"
                 else
-                  echo "ℹ️ Lightweight Tag 没有 annotation 信息，使用默认 Release Notes"
+                  echo "ℹ️ Lightweight Tag 没有 annotation 信息"
                 fi
                 
                 # 创建默认的 Release Notes
