@@ -1,7 +1,7 @@
 {
   "name": "xkcoding-api-navigator",
   "displayName": "API Navigator for Spring Boot",
-  "version": "1.0.3",
+  "version": "1.0.3.1",
   "description": "Navigate and manage REST APIs in Java SpringBoot projects",
   "icon": "images/icon.png",
   "categories": [
@@ -128,6 +128,7 @@
     "@types/node": "16.x",
     "@types/vscode": "^1.60.0",
     "jest": "^29.5.0",
+    "ovsx": "^0.8.3",
     "ts-jest": "^29.1.0",
     "typescript": "^4.9.4"
   },

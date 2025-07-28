@@ -43,6 +43,11 @@ jobs:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: npx @vscode/vsce publish --packagePath ${{ steps.package.outputs.package_name }}
       
+      - name: Publish to OpenVSX Registry
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: npx ovsx publish ${{ steps.package.outputs.package_name }} --pat $OVSX_PAT
+      
       - name: Upload VSIX to release
         run: |
           gh release upload ${{ github.event.release.tag_name }} "${{ steps.package.outputs.package_name }}" --clobber

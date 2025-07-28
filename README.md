@@ -6,6 +6,7 @@
   [![CI](https://github.com/xkcoding/API-Navigator/actions/workflows/ci.yml/badge.svg)](https://github.com/xkcoding/API-Navigator/actions/workflows/ci.yml)
   [![Release](https://github.com/xkcoding/API-Navigator/actions/workflows/release.yml/badge.svg)](https://github.com/xkcoding/API-Navigator/actions/workflows/release.yml)
   [![VSCode Marketplace](https://img.shields.io/visual-studio-marketplace/v/xkcoding.xkcoding-api-navigator)](https://marketplace.visualstudio.com/items?itemName=xkcoding.xkcoding-api-navigator)
+  [![OpenVSX](https://img.shields.io/open-vsx/v/xkcoding/xkcoding-api-navigator?label=OpenVSX)](https://open-vsx.org/extension/xkcoding/xkcoding-api-navigator)
   [![Downloads](https://img.shields.io/visual-studio-marketplace/d/xkcoding.xkcoding-api-navigator)](https://marketplace.visualstudio.com/items?itemName=xkcoding.xkcoding-api-navigator)
   [![Rating](https://img.shields.io/visual-studio-marketplace/r/xkcoding.xkcoding-api-navigator)](https://marketplace.visualstudio.com/items?itemName=xkcoding.xkcoding-api-navigator)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -16,6 +17,14 @@
 ## 📖 项目概述
 
 API Navigator 是从 IntelliJ IDEA 插件 RestfulHelper 移植而来的 VSCode 扩展，专为 Spring Boot 项目设计，提供直观的 API 端点管理和导航功能。
+
+### 🌐 全生态系统支持
+支持 VSCode 及其衍生编辑器，通过**双平台发布**覆盖完整的开发者生态：
+- **🏢 VSCode**: 官方 Visual Studio Code
+- **🎯 Cursor**: AI 代码编辑器  
+- **☁️ Gitpod**: 云端开发环境
+- **🌊 Theia**: 开源云 IDE
+- **🔓 VSCodium**: 开源 VSCode 发行版
 
 ## ✨ 主要功能
 
@@ -67,20 +76,30 @@ API Navigator 是从 IntelliJ IDEA 插件 RestfulHelper 移植而来的 VSCode �
 
 ### 安装要求
 
-- VSCode 1.60.0+
+- VSCode 1.60.0+ (或兼容的衍生编辑器)
 - Java 项目 (Spring Boot 推荐)
 
 ### 安装插件
 
-#### 方式 1: VSCode 扩展市场
+#### 方式 1: 扩展市场安装
+
+**VSCode 用户**:
 1. 在 VSCode 扩展市场搜索 "API Navigator for Spring Boot"
 2. 寻找我们的专用图标：<img src="images/icon.png" alt="Extension Icon" width="24" height="24" style="vertical-align: middle;"> 
-3. 点击安装
-4. 重新加载 VSCode
+3. 点击安装并重新加载
+
+**Cursor / Gitpod / Theia / VSCodium 用户**:
+1. 在各自的扩展市场搜索 "API Navigator for Spring Boot" 
+2. 或访问 [OpenVSX Registry](https://open-vsx.org/extension/xkcoding/xkcoding-api-navigator)
+3. 点击安装并重新加载
 
 #### 方式 2: 命令行安装
 ```bash
+# VSCode
 code --install-extension xkcoding.xkcoding-api-navigator
+
+# VSCodium  
+codium --install-extension xkcoding.xkcoding-api-navigator
 ```
 
 #### 方式 3: 手动安装
@@ -155,7 +174,9 @@ code --install-extension xkcoding.xkcoding-api-navigator
 - [x] **自动化测试**: Jest 测试框架，覆盖率 41.7%
 - [x] **代码质量**: TypeScript 编译检查，ESLint
 - [x] **安全审计**: npm audit 依赖安全检查
-- [x] **自动发布**: VSCode Marketplace 自动发布
+- [x] **双平台自动发布**: VSCode Marketplace + OpenVSX Registry 同步发布
+- [x] **发布监控**: 双平台状态检查和版本同步验证脚本
+- [x] **安全管理**: Token 环境变量保护，无明文泄露风险
 - [x] **依赖管理**: Dependabot 自动依赖更新
 - [x] **应用图标**: 多分辨率专业图标设计 (128px/256px/512px)
 - [x] **测试验证**: 在真实 Spring Boot 项目中测试完成
@@ -211,6 +232,12 @@ src/
 │   ├── api-navigator.css # WebView 样式文件
 │   ├── reset.css         # 样式重置
 │   └── vscode.css        # VSCode 主题适配
+├── scripts/               # 运维脚本 (v1.0.3+新增)
+│   └── check-publication-status.sh  # 双平台发布状态监控
+├── docs/                  # 文档体系 (v1.0.3+新增)
+│   ├── dual-marketplace-setup.md           # 双平台发布配置指南
+│   ├── openvsx-publisher-agreement-guide.md # 发布者协议指南
+│   └── ovsx-command-reference.md            # OpenVSX CLI命令参考
 └── extension.ts          # 插件入口
 ```
 
@@ -282,7 +309,9 @@ npx @vscode/vsce package
 #### 自动发布流程
 1. **创建 Release**: 在 GitHub 上创建新的 Release
 2. **自动触发**: GitHub Actions 自动执行构建和发布
-3. **多端发布**: 同时发布到 VSCode Marketplace 和 GitHub Releases
+3. **双平台发布**: 同时发布到 VSCode Marketplace 和 OpenVSX Registry
+4. **状态验证**: 自动检查双平台发布状态和版本同步
+5. **多端分发**: GitHub Releases 提供 VSIX 文件下载
 
 ### 质量保证
 
@@ -318,6 +347,49 @@ npx @vscode/vsce package
 - 确保 CI 检查通过
 
 ## 🔄 版本更新
+
+### v1.0.3+ (2025-07-28) - 双平台发布配置 🌐
+
+#### 🎊 重大生态扩展：全 VSCode 生态系统支持
+**从单一平台到双平台发布，扩展用户覆盖面至全生态**
+
+- **🌐 双平台自动发布**: 同时发布到 VSCode Marketplace 和 OpenVSX Registry
+  - **技术实现**: GitHub Actions 自动化 CI/CD 流程
+  - **用户价值**: 一次发布，覆盖 VSCode + Cursor + Gitpod + Theia + VSCodium
+  - **发布统一**: 相同版本同步发布，确保功能一致性
+
+- **🛠️ 完整运维工具链**: 专业级发布管理和监控
+  - **状态监控**: 双平台发布状态检查脚本 (150行 Bash)
+  - **版本同步**: 自动版本一致性验证和报告
+  - **安全管理**: Token 环境变量保护和最佳实践
+  - **故障排除**: 完整的问题诊断和解决指南
+
+- **📚 完整文档体系**: 4个专业指南文档
+  - **配置指南**: 5分钟快速配置双平台发布
+  - **协议指南**: Eclipse Foundation 发布者协议解决方案
+  - **命令参考**: ovsx CLI 完整功能映射
+  - **最佳实践**: Token 安全管理和发布流程标准
+
+#### 🎯 编辑器支持矩阵
+| 编辑器 | 支持状态 | 安装方式 | 备注 |
+|--------|----------|----------|------|
+| **VSCode** | ✅ 完全支持 | VSCode Marketplace | 官方平台 |
+| **Cursor** | ✅ 完全支持 | OpenVSX Registry | AI 代码编辑器 |
+| **Gitpod** | ✅ 完全支持 | OpenVSX Registry | 云端开发环境 |
+| **Theia** | ✅ 完全支持 | OpenVSX Registry | 开源云 IDE |
+| **VSCodium** | ✅ 完全支持 | OpenVSX Registry | 开源发行版 |
+
+#### 🔧 技术架构增强
+- **CI/CD 双平台集成**: 修改 `.github/workflows/release.yml` 增加 OpenVSX 发布步骤
+- **依赖管理优化**: 添加 `ovsx` CLI 工具支持 OpenVSX 发布
+- **监控脚本**: 新增 `scripts/check-publication-status.sh` 双平台状态监控
+- **安全优化**: 所有文档移除硬编码 Token，采用环境变量保护
+
+#### 💡 开发经验积累
+- **生态系统思维**: 建立了跨平台发布的完整方法论
+- **安全优先设计**: 确立了 Token 管理的安全标准
+- **自动化运维**: 实现了发布状态的自动化监控和管理
+- **知识体系化**: 沉淀了可复用的双平台发布解决方案
 
 ### v1.0.3 (2025-07-26) - 用户体验优化重大升级 🎯
 
@@ -496,6 +568,13 @@ npx @vscode/vsce package
 
 ## 🏆 项目里程碑
 
+### v1.0.3+ - 双平台发布配置里程碑 🌐
+- **🌍 生态扩展**: 从 VSCode 扩展到全 VSCode 生态系统的覆盖
+- **🚀 发布革命**: 建立了双平台自动发布的完整解决方案
+- **🛠️ 运维工具**: 完整的监控、管理、维护工具链
+- **📚 知识沉淀**: 可复用的双平台发布模板和最佳实践
+- **🔒 安全标准**: Token 管理和发布流程的安全化标准
+
 ### v1.0.3 - 用户体验优化里程碑 🎯
 - **🎯 用户中心**: 基于真实用户反馈的6个核心问题完美解决
 - **🛡️ 技术创新**: 双重状态管理、竞态条件修复等4项技术突破
@@ -519,7 +598,8 @@ npx @vscode/vsce package
 
 ### 问题报告
 - [GitHub Issues](https://github.com/xkcoding/API-Navigator/issues): 报告 Bug 或请求新功能
-- [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=xkcoding.xkcoding-api-navigator): 用户评价和反馈
+- [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=xkcoding.xkcoding-api-navigator): VSCode 用户评价和反馈
+- [OpenVSX Registry](https://open-vsx.org/extension/xkcoding/xkcoding-api-navigator): Cursor/Gitpod/Theia 用户反馈
 
 ### 社区资源
 - **文档**: [项目 Wiki](https://github.com/xkcoding/API-Navigator/wiki)
@@ -559,4 +639,6 @@ npx @vscode/vsce package
 
 **🌟 如果这个项目对你有帮助，请给我们一个 Star！** 
 
-**📦 立即体验**: [安装 API Navigator for Spring Boot](https://marketplace.visualstudio.com/items?itemName=xkcoding.xkcoding-api-navigator) 
+**📦 立即体验**:
+- **VSCode**: [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=xkcoding.xkcoding-api-navigator)
+- **Cursor/Gitpod/Theia**: [OpenVSX Registry](https://open-vsx.org/extension/xkcoding/xkcoding-api-navigator) 
