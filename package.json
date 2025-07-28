@@ -1,7 +1,7 @@
 {
   "name": "xkcoding-api-navigator",
   "displayName": "API Navigator for Spring Boot",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Navigate and manage REST APIs in Java SpringBoot projects",
   "icon": "images/icon.png",
   "categories": [
@@ -86,6 +86,11 @@
         "command": "apiNavigator.showStatistics",
         "title": "Show Statistics",
         "icon": "$(graph)"
+      },
+      {
+        "command": "apiNavigator.advancedSearch",
+        "title": "Advanced Search",
+        "icon": "$(search-view)"
       }
     ],
     "keybindings": [
@@ -105,7 +110,18 @@
       }
     ],
     "menus": {
-      "view/title": []
+      "view/title": [
+        {
+          "command": "apiNavigator.advancedSearch",
+          "when": "view == apiNavigatorView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "apiNavigator.showStatistics",
+          "when": "view == apiNavigatorView", 
+          "group": "navigation@2"
+        }
+      ]
     },
     "viewsWelcome": [
       {
@@ -125,7 +141,7 @@
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",
-    "@types/node": "16.x",
+    "@types/node": "24.x",
     "@types/vscode": "^1.60.0",
     "jest": "^29.5.0",
     "ovsx": "^0.8.3",
@@ -134,7 +150,7 @@
   },
   "dependencies": {
     "ignore": "^7.0.5",
-    "java-ast": "^0.3.0"
+    "java-ast": "^0.4.1"
   },
   "author": "xkcoding (Yangkai.Shen) <237497819@qq.com>",
   "license": "MIT",

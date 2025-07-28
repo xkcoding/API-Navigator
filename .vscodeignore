@@ -17,7 +17,23 @@ node_modules/.cache/**
 package-lock.json
 yarn.lock
 
-# 注意：保留运行时依赖
+# 优化：排除不必要的运行时依赖子文件
+node_modules/**/test/**
+node_modules/**/tests/**
+node_modules/**/spec/**
+node_modules/**/*.test.js
+node_modules/**/*.spec.js
+node_modules/**/README.md
+node_modules/**/CHANGELOG.md
+node_modules/**/LICENSE*
+node_modules/**/.github/**
+node_modules/**/docs/**
+node_modules/**/examples/**
+node_modules/**/benchmark/**
+node_modules/**/*.d.ts.map
+node_modules/**/*.js.map
+
+# 注意：保留关键运行时依赖
 # node_modules/ignore/     - 运行时需要
 # node_modules/java-ast/   - 运行时需要
 
@@ -44,6 +60,17 @@ icon-design-spec.md
 
 # RestfulHelper子项目 (源码参考，用户不需要)
 RestfulHelper/**
+
+# 优化：避免文件重复 - 排除dist目录中的重复资源
+dist/images/**
+dist/media/**
+dist/LICENSE
+dist/README.md
+
+# 优化：排除大型图片文件（保留基础icon）
+images/icon@2x.png
+images/icon@4x.png
+images/image.png
 
 # 系统文件
 .DS_Store

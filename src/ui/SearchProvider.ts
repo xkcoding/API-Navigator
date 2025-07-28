@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ApiIndexer } from '../core/ApiIndexer';
-import { ApiEndpoint, HttpMethod } from '../core/types';
+import { ApiEndpoint, HttpMethod, SearchFilters, SearchOptions } from '../core/types';
 import { IconConfig } from './IconConfig';
 import { StatisticsWebView } from './StatisticsWebView';
 
@@ -376,5 +376,275 @@ export class SearchProvider {
             reportContent.join('\n'),
             { modal: true }
         );
+    }
+
+    /**
+     * 显示高级搜索面板
+     */
+    public async showAdvancedSearch(): Promise<void> {
+        // 创建多步骤输入向导
+        const advancedSearchWizard = new AdvancedSearchWizard(this.apiIndexer);
+        await advancedSearchWizard.start();
+    }
+}
+
+/**
+ * 高级搜索向导类
+ */
+class AdvancedSearchWizard {
+    private filters: SearchFilters = {};
+    private options: SearchOptions = { caseSensitive: false, useRegex: false };
+
+    constructor(private apiIndexer: ApiIndexer) {}
+
+    /**
+     * 启动高级搜索向导
+     */
+    public async start(): Promise<void> {
+        // 步骤1: 选择搜索类型
+        const searchType = await this.selectSearchType();
+        if (!searchType) return;
+
+        switch (searchType) {
+            case 'text':
+                await this.configureTextSearch();
+                break;
+            case 'method':
+                await this.configureMethodFilter();
+                break;
+            case 'path':
+                await this.configurePathFilter();
+                break;
+            case 'advanced':
+                await this.configureAdvancedFilters();
+                break;
+        }
+
+        // 执行搜索并显示结果
+        await this.executeSearch();
+    }
+
+    /**
+     * 选择搜索类型
+     */
+    private async selectSearchType(): Promise<string | undefined> {
+        const items = [
+            {
+                label: '$(search) 文本搜索',
+                description: '在路径、控制器、方法名中搜索文本',
+                detail: '支持模糊匹配，适合快速查找',
+                value: 'text'
+            },
+            {
+                label: '$(symbol-method) HTTP方法过滤',
+                description: '按HTTP方法筛选端点',
+                detail: 'GET, POST, PUT, DELETE, PATCH等',
+                value: 'method'
+            },
+            {
+                label: '$(file-directory) 路径模式匹配',
+                description: '使用通配符或正则匹配路径',
+                detail: '支持 * 通配符和正则表达式',
+                value: 'path'
+            },
+            {
+                label: '$(settings-gear) 高级组合搜索',
+                description: '组合多种搜索条件',
+                detail: '同时使用多个过滤器进行精确查找',
+                value: 'advanced'
+            }
+        ];
+
+        const selected = await vscode.window.showQuickPick(items, {
+            placeHolder: '选择搜索类型',
+            ignoreFocusOut: true
+        });
+
+        return selected?.value;
+    }
+
+    /**
+     * 配置文本搜索
+     */
+    private async configureTextSearch(): Promise<void> {
+        const query = await vscode.window.showInputBox({
+            prompt: '输入搜索文本',
+            placeHolder: '例如: user, UserController, findById',
+            ignoreFocusOut: true
+        });
+
+        if (query) {
+            this.filters.query = query;
+            
+            // 询问是否区分大小写
+            const caseSensitive = await vscode.window.showQuickPick(
+                [
+                    { label: '不区分大小写', value: false },
+                    { label: '区分大小写', value: true }
+                ],
+                { placeHolder: '选择大小写敏感性' }
+            );
+
+            if (caseSensitive) {
+                this.options.caseSensitive = caseSensitive.value;
+            }
+        }
+    }
+
+    /**
+     * 配置HTTP方法过滤
+     */
+    private async configureMethodFilter(): Promise<void> {
+        const availableMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
+        const items = availableMethods.map(method => ({
+            label: method,
+            description: this.getMethodDescription(method)
+        }));
+
+        const selected = await vscode.window.showQuickPick(items, {
+            placeHolder: '选择HTTP方法 (支持多选)',
+            canPickMany: true,
+            ignoreFocusOut: true
+        });
+
+        if (selected && selected.length > 0) {
+            this.filters.methods = selected.map(item => item.label);
+        }
+    }
+
+    /**
+     * 配置路径过滤
+     */
+    private async configurePathFilter(): Promise<void> {
+        const pattern = await vscode.window.showInputBox({
+            prompt: '输入路径模式',
+            placeHolder: '例如: /api/users/*, /api/v*/users, ^/api/users/\\d+$',
+            value: '/api/*',
+            ignoreFocusOut: true
+        });
+
+        if (pattern) {
+            this.filters.pathPattern = pattern;
+
+            // 询问是否使用正则表达式
+            const useRegex = await vscode.window.showQuickPick(
+                [
+                    { label: '通配符匹配 (*)', description: '简单的通配符匹配，适合大部分场景', value: false },
+                    { label: '正则表达式', description: '完整的正则表达式支持，更强大但需要技术背景', value: true }
+                ],
+                { placeHolder: '选择匹配模式' }
+            );
+
+            if (useRegex) {
+                this.options.useRegex = useRegex.value;
+            }
+        }
+    }
+
+    /**
+     * 配置高级组合过滤器
+     */
+    private async configureAdvancedFilters(): Promise<void> {
+        // 这里可以实现一个更复杂的多步骤配置
+        await vscode.window.showInformationMessage(
+            '高级搜索功能开发中，敬请期待！\n当前可使用其他搜索类型。',
+            { modal: true }
+        );
+    }
+
+    /**
+     * 执行搜索并显示结果
+     */
+    private async executeSearch(): Promise<void> {
+        if (Object.keys(this.filters).length === 0) {
+            await vscode.window.showWarningMessage('未设置任何搜索条件');
+            return;
+        }
+
+        try {
+            const startTime = Date.now();
+            const results = this.apiIndexer.searchEndpointsAdvanced(this.filters, this.options);
+            const duration = Date.now() - startTime;
+
+            if (results.length === 0) {
+                await vscode.window.showInformationMessage('未找到匹配的API端点');
+                return;
+            }
+
+            // 创建搜索结果快速选择器
+            const quickPick = vscode.window.createQuickPick();
+            quickPick.title = `搜索结果 (${results.length} 个, ${duration}ms)`;
+            quickPick.placeholder = '选择要查看的API端点';
+            quickPick.items = this.createResultItems(results);
+
+            quickPick.onDidAccept(() => {
+                const selected = quickPick.selectedItems[0];
+                if (selected && 'endpoint' in selected) {
+                    this.navigateToEndpoint((selected as any).endpoint);
+                }
+                quickPick.dispose();
+            });
+
+            quickPick.show();
+
+        } catch (error) {
+            console.error('搜索执行失败:', error);
+            await vscode.window.showErrorMessage(`搜索失败: ${error}`);
+        }
+    }
+
+    /**
+     * 创建搜索结果项目
+     */
+    private createResultItems(endpoints: ApiEndpoint[]): vscode.QuickPickItem[] {
+        return endpoints.map(endpoint => ({
+            label: `$(symbol-method) ${endpoint.method} ${endpoint.path}`,
+            description: endpoint.controllerClass,
+            detail: `${endpoint.methodName} - ${endpoint.location.filePath || ''}`,
+            endpoint: endpoint
+        } as any));
+    }
+
+    /**
+     * 导航到端点定义
+     */
+    private async navigateToEndpoint(endpoint: ApiEndpoint): Promise<void> {
+        if (!endpoint.location.filePath) {
+            await vscode.window.showWarningMessage('无法定位到源代码文件');
+            return;
+        }
+
+        try {
+            const document = await vscode.workspace.openTextDocument(endpoint.location.filePath);
+            const editor = await vscode.window.showTextDocument(document);
+            
+            if (endpoint.location.startLine && endpoint.location.startLine > 0) {
+                const position = new vscode.Position(endpoint.location.startLine - 1, endpoint.location.startColumn || 0);
+                editor.selection = new vscode.Selection(position, position);
+                editor.revealRange(
+                    new vscode.Range(position, position), 
+                    vscode.TextEditorRevealType.InCenter
+                );
+            }
+        } catch (error) {
+            console.error('导航失败:', error);
+            await vscode.window.showErrorMessage(`无法打开文件: ${endpoint.location.filePath}`);
+        }
+    }
+
+    /**
+     * 获取HTTP方法描述
+     */
+    private getMethodDescription(method: string): string {
+        const descriptions: Record<string, string> = {
+            'GET': '获取资源',
+            'POST': '创建资源',
+            'PUT': '完整更新资源',
+            'PATCH': '部分更新资源',
+            'DELETE': '删除资源',
+            'HEAD': '获取响应头',
+            'OPTIONS': '获取支持的方法'
+        };
+        return descriptions[method] || '其他操作';
     }
 } 

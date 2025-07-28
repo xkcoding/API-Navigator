@@ -25,7 +25,7 @@ export class JavaASTParser {
     /**
      * 解析 Java 文件并提取 API 端点
      */
-    public static async parseFile(filePath: string, content: string): Promise<ApiEndpoint[]> {
+    public static async parseFile(filePath: string, content: string, fileModifiedTime?: number): Promise<ApiEndpoint[]> {
         try {
             const ast = parse(content);
 
@@ -33,7 +33,7 @@ export class JavaASTParser {
             const controllers = this.findControllerClasses(ast);
 
             for (const controller of controllers) {
-                const controllerInfo = this.parseController(controller, filePath);
+                const controllerInfo = this.parseController(controller, filePath, fileModifiedTime);
                 endpoints.push(...controllerInfo.methods);
             }
 
@@ -387,12 +387,30 @@ export class JavaASTParser {
     }
 
     /**
-     * 提取方法名
+     * 提取方法名 - 兼容新版本java-ast
      */
     private static extractMethodName(methodNode: any): string {
-        // MethodDeclarationContext结构中查找方法名
+        // 尝试多种方式提取方法名，适配不同版本的java-ast
+        
+        // 方式1: 直接访问name属性 (适配新版本)
+        if (methodNode.name) {
+            return methodNode.name;
+        }
+        
+        // 方式2: 查找identifier节点
         if (methodNode.children) {
             for (const child of methodNode.children) {
+                // 查找方法标识符节点
+                if (child.constructor.name === 'IdentifierContext' || 
+                    child.constructor.name === 'Identifier' ||
+                    (child.symbol && child.symbol.type === 'IDENTIFIER')) {
+                    const text = this.getNodeText(child);
+                    if (text && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(text)) {
+                        return text;
+                    }
+                }
+                
+                // 旧版本的TerminalNode方式 (向后兼容)
                 if (child.constructor.name === 'TerminalNode') {
                     const text = this.getNodeText(child);
                     if (text && 
@@ -403,18 +421,34 @@ export class JavaASTParser {
                 }
             }
         }
+        
+        // 方式3: 尝试从方法签名中解析 (最后的后备方案)
+        const methodText = this.getNodeText(methodNode);
+        if (methodText) {
+            // 使用正则表达式提取方法名
+            const methodMatch = methodText.match(/\b[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(/);
+            if (methodMatch) {
+                const extractedName = methodMatch[0].replace(/\s*\($/, '');
+                if (extractedName && 
+                    !['public', 'private', 'protected', 'static', 'void', 'final', 'abstract'].includes(extractedName)) {
+                    return extractedName;
+                }
+            }
+        }
+        
+        console.warn('⚠️ 无法解析方法名，使用默认值. 方法节点:', methodNode?.constructor?.name);
         return 'unknownMethod';
     }
 
     /**
      * 解析控制器类，提取所有 API 端点
      */
-    private static parseController(controller: ClassNode, filePath: string): ControllerInfo {
+    private static parseController(controller: ClassNode, filePath: string, fileModifiedTime?: number): ControllerInfo {
         const classLevelMapping = this.extractClassMapping(controller);
         const endpoints: ApiEndpoint[] = [];
 
         for (const method of controller.methods) {
-            const endpoint = this.parseMethod(method, controller.name, classLevelMapping, filePath);
+            const endpoint = this.parseMethod(method, controller.name, classLevelMapping, filePath, fileModifiedTime);
             if (endpoint) {
                 endpoints.push(endpoint);
             }
@@ -445,7 +479,7 @@ export class JavaASTParser {
     /**
      * 解析单个方法，生成 API 端点
      */
-    private static parseMethod(method: MethodNode, controllerClass: string, classLevelMapping: string, filePath: string): ApiEndpoint | null {
+    private static parseMethod(method: MethodNode, controllerClass: string, classLevelMapping: string, filePath: string, fileModifiedTime?: number): ApiEndpoint | null {
         const mappingAnnotation = method.annotations.find(ann => 
             this.MAPPING_ANNOTATIONS.includes(ann.name)
         );
@@ -479,7 +513,8 @@ export class JavaASTParser {
                 fullPath,
                 hasClassMapping: !!classLevelMapping,
                 hasMethodMapping: !!methodMapping
-            }
+            },
+            fileModifiedTime
         };
     }
 

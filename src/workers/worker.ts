@@ -45,16 +45,18 @@ async function parseFiles(filePaths: string[], taskId?: string): Promise<void> {
                 continue;
             }
 
-            // 读取文件内容
+            // 读取文件内容和修改时间
             const content = fs.readFileSync(filePath, 'utf-8');
+            const stats = fs.statSync(filePath);
+            const fileModifiedTime = stats.mtime.getTime();
             
             // 跳过空文件
             if (!content.trim()) {
                 continue;
             }
 
-            // 解析 Java 文件
-            const endpoints = await JavaASTParser.parseFile(filePath, content);
+            // 解析 Java 文件，包含修改时间
+            const endpoints = await JavaASTParser.parseFile(filePath, content, fileModifiedTime);
             allEndpoints.push(...endpoints);
 
         } catch (error) {
@@ -81,7 +83,9 @@ async function parseFile(filePath: string, taskId?: string): Promise<void> {
         }
 
         const content = fs.readFileSync(filePath, 'utf-8');
-        const endpoints = await JavaASTParser.parseFile(filePath, content);
+        const stats = fs.statSync(filePath);
+        const fileModifiedTime = stats.mtime.getTime();
+        const endpoints = await JavaASTParser.parseFile(filePath, content, fileModifiedTime);
 
         parentPort?.postMessage({
             type: 'result',

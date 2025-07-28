@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ApiIndexer } from '../core/ApiIndexer';
-import { ApiEndpoint } from '../core/types';
+import { ApiEndpoint, SearchFilters, SearchOptions } from '../core/types';
 
 /**
  * WebView Provider for API Navigator with embedded search
@@ -36,6 +36,9 @@ export class ApiNavigatorWebView implements vscode.WebviewViewProvider {
                 case 'search':
                     this._handleSearch(data.query);
                     break;
+                case 'advancedSearch':
+                    this._handleAdvancedSearch(data.filters, data.options);
+                    break;
                 case 'openEndpoint':
                     this._openEndpoint(data.endpoint);
                     break;
@@ -56,9 +59,19 @@ export class ApiNavigatorWebView implements vscode.WebviewViewProvider {
 
         // 监听视图可见性变化
         webviewView.onDidChangeVisibility(() => {
-            if (webviewView.visible && !this._isDataLoaded && !this._isRefreshing) {
-                // 当视图重新可见且数据未加载时，重新加载数据
-                this._loadInitialData();
+            if (webviewView.visible) {
+                console.log(`📍 视图可见性变化: visible=true, isDataLoaded=${this._isDataLoaded}`);
+                
+                // 如果数据已经加载过，直接发送当前数据，避免loading状态
+                if (this._isDataLoaded) {
+                    const allEndpoints = this.apiIndexer.getAllEndpoints();
+                    this._sendDataToWebview(allEndpoints, '');
+                    console.log('📍 视图重新可见，直接发送已有数据');
+                } else if (!this._isRefreshing) {
+                    // 只有在数据确实未加载且没有刷新进行中时才加载
+                    console.log('📍 视图重新可见，首次加载数据');
+                    this._loadInitialData();
+                }
             }
         });
 
@@ -76,6 +89,50 @@ export class ApiNavigatorWebView implements vscode.WebviewViewProvider {
             const searchResults = this.apiIndexer.searchEndpoints(query);
             this._sendDataToWebview(searchResults, query);
         }
+    }
+
+    private _handleAdvancedSearch(filters: SearchFilters, options: SearchOptions) {
+        try {
+            // 执行高级搜索
+            const searchResults = this.apiIndexer.searchEndpointsAdvanced(filters, options);
+            
+            // 构建搜索描述
+            const searchDescription = this._buildSearchDescription(filters);
+            
+            // 发送结果到 WebView
+            this._sendDataToWebview(searchResults, searchDescription);
+            
+            console.log(`高级搜索完成: 找到 ${searchResults.length} 个结果`);
+        } catch (error) {
+            console.error('高级搜索失败:', error);
+            vscode.window.showErrorMessage(`搜索失败: ${error}`);
+        }
+    }
+
+    private _buildSearchDescription(filters: SearchFilters): string {
+        const descriptions: string[] = [];
+        
+        if (filters.query) {
+            descriptions.push(`文本: "${filters.query}"`);
+        }
+        
+        if (filters.methods && filters.methods.length > 0) {
+            descriptions.push(`方法: ${filters.methods.join(', ')}`);
+        }
+        
+        if (filters.pathPattern) {
+            descriptions.push(`路径: "${filters.pathPattern}"`);
+        }
+        
+        if (filters.hasParameters !== undefined) {
+            descriptions.push(`参数: ${filters.hasParameters ? '包含' : '不包含'}`);
+        }
+        
+        if (filters.controllerPattern) {
+            descriptions.push(`控制器: "${filters.controllerPattern}"`);
+        }
+        
+        return descriptions.length > 0 ? `高级搜索 (${descriptions.join(', ')})` : '高级搜索';
     }
 
     private _openEndpoint(endpoint: ApiEndpoint) {
@@ -136,9 +193,14 @@ export class ApiNavigatorWebView implements vscode.WebviewViewProvider {
 
     private _handleWebviewReady() {
         // WebView准备就绪时的处理
-        if (!this._isDataLoaded && !this._isRefreshing) {
-            this._loadInitialData();
-        }
+        console.log(`📋 WebView准备就绪: isDataLoaded=${this._isDataLoaded}, isRefreshing=${this._isRefreshing}`);
+        
+        // 总是发送当前数据状态，避免空白页面
+        const allEndpoints = this.apiIndexer.getAllEndpoints();
+        this._sendDataToWebview(allEndpoints, '');
+        
+        // 标记数据已加载
+        this._isDataLoaded = true;
     }
 
     private _handleRequestData() {
@@ -212,6 +274,9 @@ export class ApiNavigatorWebView implements vscode.WebviewViewProvider {
                     <div class="search-info">
                         <span id="searchInfo">准备搜索...</span>
                         <div class="toolbar-buttons">
+                            <button id="advancedSearchBtn" class="toolbar-btn" title="高级搜索">
+                                <span class="btn-icon">⚙️</span>
+                            </button>
                             <button id="toggleCollapseBtn" class="toolbar-btn" title="展开/折叠所有分组">
                                 <span class="btn-icon">🔀</span>
                             </button>
@@ -241,6 +306,70 @@ export class ApiNavigatorWebView implements vscode.WebviewViewProvider {
                     <div id="resultsSection" class="results-section" style="display: none;">
                         <div id="resultsList" class="results-list">
                             <!-- 动态内容将在这里填充 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 高级搜索区域 (内联折叠式) -->
+                <div id="advancedSearchContainer" class="advanced-search-container" style="display: none;">
+                    <div class="advanced-search-header">
+                        <h4>🔍 高级搜索</h4>
+                        <button id="closeAdvancedSearch" class="close-btn" title="关闭高级搜索">✕</button>
+                    </div>
+                    
+                    <div class="advanced-search-content">
+                        <div class="search-row">
+                            <!-- HTTP方法快速过滤 -->
+                            <div class="filter-group">
+                                <label>方法</label>
+                                <div class="method-filters">
+                                    <button class="method-filter all-methods active" data-method="ALL">全部</button>
+                                    <button class="method-filter" data-method="GET">GET</button>
+                                    <button class="method-filter" data-method="POST">POST</button>
+                                    <button class="method-filter" data-method="PUT">PUT</button>
+                                    <button class="method-filter" data-method="DELETE">DEL</button>
+                                    <button class="method-filter" data-method="PATCH">PATCH</button>
+                                </div>
+                            </div>
+                            
+                            <!-- 路径类型快速过滤 -->
+                            <div class="filter-group">
+                                <label>类型</label>
+                                <div class="type-filters">
+                                    <button class="type-filter active" data-type="all">全部</button>
+                                    <button class="type-filter" data-type="param">参数化</button>
+                                    <button class="type-filter" data-type="static">静态</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="search-row">
+                            <!-- 路径模式搜索 -->
+                            <div class="input-group">
+                                <label for="pathPattern">路径模式</label>
+                                <input type="text" id="pathPattern" placeholder="/api/*, /users/{id}">
+                            </div>
+                            
+                            <!-- 控制器搜索 -->
+                            <div class="input-group">
+                                <label for="controllerPattern">控制器</label>
+                                <input type="text" id="controllerPattern" placeholder="UserController, *Service">
+                            </div>
+                        </div>
+                        
+                        <div class="search-actions">
+                            <div class="search-options">
+                                <label class="option-label">
+                                    <input type="checkbox" id="caseSensitive"> 区分大小写
+                                </label>
+                                <label class="option-label">
+                                    <input type="checkbox" id="useRegex"> 正则表达式
+                                </label>
+                            </div>
+                            <div class="action-buttons">
+                                <button id="resetAdvancedSearch" class="btn-reset">重置</button>
+                                <button id="executeAdvancedSearch" class="btn-search">搜索</button>
+                            </div>
                         </div>
                     </div>
                 </div>

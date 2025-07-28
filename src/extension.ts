@@ -70,6 +70,11 @@ export async function activate(context: vscode.ExtensionContext) {
         // 统计信息命令
         vscode.commands.registerCommand('apiNavigator.showStatistics', () => {
             searchProvider.showStatistics();
+        }),
+
+        // 高级搜索命令
+        vscode.commands.registerCommand('apiNavigator.advancedSearch', () => {
+            searchProvider.showAdvancedSearch();
         })
     ];
 

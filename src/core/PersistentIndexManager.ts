@@ -2,13 +2,15 @@ import * as vscode from 'vscode';
 import { FileSystemCache } from './FileSystemCache';
 import { FileHasher } from './FileHasher';
 import { ApiIndexer } from './ApiIndexer';
+import { VersionManager } from './VersionManager';
 import { 
     CacheData, 
     CacheStatistics, 
     CacheStatus, 
     RefreshProgress, 
     FileChangeSet,
-    ApiEndpoint 
+    ApiEndpoint,
+    VersionCompatibility 
 } from './types';
 
 /**
@@ -18,6 +20,7 @@ import {
 export class PersistentIndexManager {
     private readonly fileSystemCache: FileSystemCache;
     private readonly fileHasher: FileHasher;
+    private readonly versionManager: VersionManager;
     private workspaceHash: string = '';
     private currentCacheData: CacheData | null = null;
     
@@ -38,6 +41,7 @@ export class PersistentIndexManager {
     ) {
         this.fileSystemCache = new FileSystemCache(cacheOptions);
         this.fileHasher = new FileHasher();
+        this.versionManager = new VersionManager();
     }
 
     /**
@@ -82,6 +86,38 @@ export class PersistentIndexManager {
             
             if (cachedData) {
                 console.log(`缓存加载成功: ${cachedData.endpoints.length} 个端点`);
+                
+                // 版本兼容性检查 🆕
+                const cachedPluginVersion = cachedData.pluginVersion || '0.0.0';
+                const compatibility = this.versionManager.checkVersionCompatibility(cachedPluginVersion);
+                
+                if (this.versionManager.shouldClearCache(compatibility)) {
+                    // 版本不兼容，清除缓存并重新索引
+                    this.versionManager.logVersionChange(
+                        cachedPluginVersion, 
+                        this.versionManager.getCurrentPluginVersion(), 
+                        '清除不兼容缓存'
+                    );
+                    
+                    console.log('🗑️ 版本不兼容，清除缓存并重新索引...');
+                    await this.fileSystemCache.clearCache(this.workspaceHash);
+                    await this.fallbackToFullIndex();
+                    return;
+                } else if (this.versionManager.shouldMigrateCache(compatibility)) {
+                    // 需要迁移缓存数据
+                    console.log('⬆️ 执行缓存数据迁移...');
+                    cachedData.pluginVersion = this.versionManager.getCurrentPluginVersion();
+                    cachedData.lastUpdated = Date.now();
+                    
+                    // 保存迁移后的缓存
+                    await this.fileSystemCache.saveCache(this.workspaceHash, cachedData);
+                    
+                    this.versionManager.logVersionChange(
+                        cachedPluginVersion, 
+                        this.versionManager.getCurrentPluginVersion(), 
+                        '缓存迁移'
+                    );
+                }
                 
                 // 立即应用缓存数据到索引器
                 await this.applyCache(cachedData);
@@ -296,7 +332,8 @@ export class PersistentIndexManager {
             };
 
             const cacheData: CacheData = {
-                version: '1.0.0',
+                version: this.versionManager.getCacheFormatVersion(),
+                pluginVersion: this.versionManager.getCurrentPluginVersion(),
                 workspaceHash: this.workspaceHash,
                 createdAt: this.currentCacheData?.createdAt || Date.now(),
                 lastUpdated: Date.now(),

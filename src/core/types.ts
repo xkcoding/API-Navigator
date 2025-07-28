@@ -12,6 +12,7 @@ export interface ApiEndpoint {
     location: CodeLocation;
     annotations: Annotation[];
     pathComposition: PathComposition;
+    fileModifiedTime?: number; // 文件最后修改时间戳
 }
 
 export interface CodeLocation {
@@ -82,6 +83,7 @@ export interface MethodNode {
  */
 export interface CacheData {
     version: string;                        // 缓存格式版本
+    pluginVersion: string;                  // 插件版本 (用于版本兼容性检查)
     workspaceHash: string;                  // 工作区唯一标识
     createdAt: number;                      // 创建时间戳
     lastUpdated: number;                    // 最后更新时间戳
@@ -146,4 +148,47 @@ export interface CacheOptions {
     maxCacheAge: number;                    // 缓存最大年龄(毫秒)
     compressionEnabled: boolean;            // 是否启用压缩
     autoCleanup: boolean;                   // 是否自动清理过期缓存
+}
+
+// ==================== VERSION MANAGEMENT TYPES ====================
+
+/**
+ * 版本兼容性检查结果
+ */
+export enum VersionCompatibility {
+    COMPATIBLE = 'compatible',              // 兼容 - 可以继续使用缓存
+    INCOMPATIBLE = 'incompatible',          // 不兼容 - 需要清除缓存
+    UPGRADE = 'upgrade',                    // 升级 - 需要迁移缓存
+    DOWNGRADE = 'downgrade'                 // 降级 - 需要清除缓存
+}
+
+/**
+ * 语义化版本号结构
+ */
+export interface SemanticVersion {
+    major: number;
+    minor: number;
+    patch: number;
+}
+
+// ==================== SEARCH FILTER TYPES ====================
+
+/**
+ * 高级搜索过滤器
+ */
+export interface SearchFilters {
+    query?: string;                         // 文本搜索查询
+    methods?: string[];                     // HTTP方法过滤 ['GET', 'POST', ...]
+    pathPattern?: string;                   // 路径模式匹配 (支持通配符和正则)
+    hasParameters?: boolean;                // 是否包含路径参数
+    controllerPattern?: string;             // 控制器名称模式匹配
+}
+
+/**
+ * 搜索选项
+ */
+export interface SearchOptions {
+    caseSensitive?: boolean;                // 是否区分大小写
+    useRegex?: boolean;                     // 是否使用正则表达式
+    maxResults?: number;                    // 最大结果数量
 }

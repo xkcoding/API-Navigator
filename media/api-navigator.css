@@ -328,14 +328,23 @@
 }
 
 .controller-toggle {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--vscode-icon-foreground);
-    transition: transform 0.2s;
     user-select: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    line-height: 1;
+    font-family: 'Segoe UI', 'San Francisco', system-ui, sans-serif;
+    text-align: center;
+    flex-shrink: 0;
 }
 
 .controller-group.collapsed .controller-toggle {
-    transform: rotate(-90deg);
+    /* 移除旋转，因为JavaScript已经设置了正确的箭头字符 ▶ */
+    /* transform: rotate(-90deg); */
 }
 
 .controller-title {
@@ -357,6 +366,8 @@
 .controller-endpoints {
     transition: all 0.2s ease-out;
     overflow: hidden;
+    max-height: 1000px; /* 为展开状态设置足够大的最大高度 */
+    opacity: 1;
 }
 
 .controller-group.collapsed .controller-endpoints {
@@ -388,5 +399,205 @@
     
     .empty-icon {
         font-size: 36px;
+    }
+}
+
+/* ===== 内联高级搜索样式 ===== */
+.advanced-search-container {
+    background-color: var(--vscode-sideBar-background);
+    border: 1px solid var(--vscode-sideBar-border);
+    border-radius: 6px;
+    margin: 8px 0;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.advanced-search-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background-color: var(--vscode-list-hoverBackground);
+    border-bottom: 1px solid var(--vscode-sideBar-border);
+}
+
+.advanced-search-header h4 {
+    margin: 0;
+    font-size: 14px;
+    color: var(--vscode-foreground);
+    font-weight: 600;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    color: var(--vscode-icon-foreground);
+    padding: 4px;
+    border-radius: 3px;
+    transition: background-color 0.2s;
+}
+
+.close-btn:hover {
+    background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.advanced-search-content {
+    padding: 16px;
+}
+
+.search-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: var(--vscode-foreground);
+    font-weight: 500;
+}
+
+.method-filters, .type-filters {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.method-filter, .type-filter {
+    padding: 4px 8px;
+    border: 1px solid var(--vscode-button-border);
+    border-radius: 3px;
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.method-filter:hover, .type-filter:hover {
+    background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.method-filter.active, .type-filter.active {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border-color: var(--vscode-button-background);
+}
+
+.input-group {
+    flex: 1;
+    min-width: 180px;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--vscode-foreground);
+    font-weight: 500;
+}
+
+.input-group input[type="text"] {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 3px;
+    background-color: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    font-size: 12px;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.input-group input[type="text"]:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder);
+}
+
+.search-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--vscode-sideBar-border);
+}
+
+.search-options {
+    display: flex;
+    gap: 16px;
+}
+
+.option-label {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+}
+
+.option-label input {
+    margin-right: 6px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-reset, .btn-search {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.2s;
+}
+
+.btn-reset {
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border: 1px solid var(--vscode-button-border);
+}
+
+.btn-reset:hover {
+    background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.btn-search {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.btn-search:hover {
+    background-color: var(--vscode-button-hoverBackground);
+}
+
+/* 响应式调整 */
+@media (max-width: 500px) {
+    .search-row {
+        flex-direction: column;
+    }
+    
+    .search-actions {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+    
+    .action-buttons {
+        justify-content: center;
     }
 } 

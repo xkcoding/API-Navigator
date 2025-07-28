@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import ignore from 'ignore';
-import { ApiEndpoint, HttpMethod } from './types';
+import { ApiEndpoint, HttpMethod, SearchFilters, SearchOptions } from './types';
 import { WorkerPool } from './WorkerPool';
 import { JavaASTParser } from './JavaASTParser';
 
@@ -205,7 +205,11 @@ export class ApiIndexer {
         for (const filePath of javaFiles) {
             try {
                 const content = fs.readFileSync(filePath, 'utf-8');
-                const endpoints = await JavaASTParser.parseFile(filePath, content);
+                // 获取文件修改时间
+                const stats = fs.statSync(filePath);
+                const fileModifiedTime = stats.mtime.getTime();
+                
+                const endpoints = await JavaASTParser.parseFile(filePath, content, fileModifiedTime);
                 this.addEndpoints(endpoints);
             } catch (error) {
                 console.error(`单线程解析文件失败: ${filePath}`, error);
@@ -395,6 +399,136 @@ export class ApiIndexer {
     }
 
     /**
+     * 高级搜索端点 - 支持多维度过滤
+     */
+    public searchEndpointsAdvanced(filters: SearchFilters, options: SearchOptions = {}): ApiEndpoint[] {
+        let results: ApiEndpoint[] = Array.from(this.endpoints.values());
+
+        // 1. 文本搜索过滤
+        if (filters.query && filters.query.trim()) {
+            const query = options.caseSensitive ? filters.query.trim() : filters.query.trim().toLowerCase();
+            
+            results = results.filter(endpoint => {
+                const searchTargets = [
+                    endpoint.path,
+                    endpoint.controllerClass,
+                    endpoint.methodName,
+                    endpoint.method
+                ];
+
+                return searchTargets.some(target => {
+                    const searchTarget = options.caseSensitive ? target : target.toLowerCase();
+                    
+                    if (options.useRegex) {
+                        try {
+                            const regex = new RegExp(query, options.caseSensitive ? 'g' : 'gi');
+                            return regex.test(searchTarget);
+                        } catch (error) {
+                            // 正则表达式无效，降级为普通文本搜索
+                            return searchTarget.includes(query);
+                        }
+                    } else {
+                        return searchTarget.includes(query);
+                    }
+                });
+            });
+        }
+
+        // 2. HTTP方法过滤
+        if (filters.methods && filters.methods.length > 0) {
+            const methodsSet = new Set(filters.methods.map(m => m.toUpperCase()));
+            console.log('🔍 HTTP方法过滤调试:', {
+                原始方法列表: filters.methods,
+                转换后Set: Array.from(methodsSet),
+                过滤前端点数: results.length,
+                端点方法样本: results.slice(0, 3).map(ep => ep.method)
+            });
+            
+            const beforeFilter = results.length;
+            results = results.filter(endpoint => {
+                const hasMethod = methodsSet.has(endpoint.method.toUpperCase());
+                if (!hasMethod) {
+                    console.log(`❌ 排除端点: ${endpoint.method} ${endpoint.path} (不在${Array.from(methodsSet)}中)`);
+                }
+                return hasMethod;
+            });
+            
+            console.log(`🎯 HTTP方法过滤结果: ${beforeFilter} -> ${results.length} 个端点`);
+        }
+
+        // 3. 路径模式过滤
+        if (filters.pathPattern && filters.pathPattern.trim()) {
+            const pattern = filters.pathPattern.trim();
+            
+            results = results.filter(endpoint => {
+                const path = options.caseSensitive ? endpoint.path : endpoint.path.toLowerCase();
+                const searchPattern = options.caseSensitive ? pattern : pattern.toLowerCase();
+                
+                // 支持通配符 * 匹配
+                if (pattern.includes('*')) {
+                    const regexPattern = searchPattern
+                        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // 转义特殊字符
+                        .replace(/\\*/g, '.*'); // 将 \* 转换为 .*
+                    
+                    try {
+                        const regex = new RegExp(`^${regexPattern}$`, options.caseSensitive ? '' : 'i');
+                        return regex.test(path);
+                    } catch (error) {
+                        return path.includes(searchPattern);
+                    }
+                } else if (options.useRegex) {
+                    // 直接使用正则表达式
+                    try {
+                        const regex = new RegExp(pattern, options.caseSensitive ? 'g' : 'gi');
+                        return regex.test(path);
+                    } catch (error) {
+                        return path.includes(searchPattern);
+                    }
+                } else {
+                    // 普通文本匹配
+                    return path.includes(searchPattern);
+                }
+            });
+        }
+
+        // 4. 路径参数过滤
+        if (filters.hasParameters !== undefined) {
+            results = results.filter(endpoint => {
+                const hasParams = endpoint.path.includes('{') && endpoint.path.includes('}');
+                return filters.hasParameters ? hasParams : !hasParams;
+            });
+        }
+
+        // 5. 控制器模式过滤
+        if (filters.controllerPattern && filters.controllerPattern.trim()) {
+            const pattern = filters.controllerPattern.trim();
+            
+            results = results.filter(endpoint => {
+                const controller = options.caseSensitive ? endpoint.controllerClass : endpoint.controllerClass.toLowerCase();
+                const searchPattern = options.caseSensitive ? pattern : pattern.toLowerCase();
+                
+                if (options.useRegex) {
+                    try {
+                        const regex = new RegExp(pattern, options.caseSensitive ? 'g' : 'gi');
+                        return regex.test(controller);
+                    } catch (error) {
+                        return controller.includes(searchPattern);
+                    }
+                } else {
+                    return controller.includes(searchPattern);
+                }
+            });
+        }
+
+        // 6. 应用结果数量限制
+        if (options.maxResults && options.maxResults > 0) {
+            results = results.slice(0, options.maxResults);
+        }
+
+        return this.sortEndpoints(results);
+    }
+
+    /**
      * 按 HTTP 方法过滤
      */
     public findByMethod(method: HttpMethod): ApiEndpoint[] {
@@ -540,7 +674,9 @@ export class ApiIndexer {
             // 解析文件
             if (fs.existsSync(filePath)) {
                 const content = fs.readFileSync(filePath, 'utf-8');
-                const endpoints = await JavaASTParser.parseFile(filePath, content);
+                const stats = fs.statSync(filePath);
+                const fileModifiedTime = stats.mtime.getTime();
+                const endpoints = await JavaASTParser.parseFile(filePath, content, fileModifiedTime);
                 
                 // 先删除该文件的旧端点
                 this.removeEndpointsByFile(filePath);
