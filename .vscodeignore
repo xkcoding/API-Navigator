@@ -26,8 +26,24 @@ yarn.lock
 .cursor/**
 .history/**
 .specstory/**
+
+# Memory Bank 和项目文档 (开发记录)
 .memory-bank/**
 memory-bank/**
+
+# 双平台发布配置文档 (开发者指南，用户不需要)
+docs/**
+scripts/**
+
+# CI/CD 配置 (用户不需要)
+.github/**
+
+# 开发指南文档 (用户不需要)
+local-verification-guide.md
+icon-design-spec.md
+
+# RestfulHelper子项目 (源码参考，用户不需要)
+RestfulHelper/**
 
 # 系统文件
 .DS_Store
@@ -66,16 +82,6 @@ build/**
 
 # 环境变量文件
 .env*
-
-# 文档 (可选，如果你想在插件中包含README可以移除这行)
-# README.md
-# LICENSE
-
-# RestfulHelper子项目 (如果不需要在插件中包含)
-RestfulHelper/**
-
-# 验证指南等开发文档
-local-verification-guide.md
 
 # IDE 配置
 .idea/**

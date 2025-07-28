@@ -232,9 +232,9 @@ src/
 │   ├── api-navigator.css # WebView 样式文件
 │   ├── reset.css         # 样式重置
 │   └── vscode.css        # VSCode 主题适配
-├── scripts/               # 运维脚本 (v1.0.3+新增)
+├── scripts/               # 运维脚本 (v1.0.4新增)
 │   └── check-publication-status.sh  # 双平台发布状态监控
-├── docs/                  # 文档体系 (v1.0.3+新增)
+├── docs/                  # 文档体系 (v1.0.4新增)
 │   ├── dual-marketplace-setup.md           # 双平台发布配置指南
 │   ├── openvsx-publisher-agreement-guide.md # 发布者协议指南
 │   └── ovsx-command-reference.md            # OpenVSX CLI命令参考
@@ -348,7 +348,7 @@ npx @vscode/vsce package
 
 ## 🔄 版本更新
 
-### v1.0.3+ (2025-07-28) - 双平台发布配置 🌐
+### v1.0.4 (2025-07-28) - 双平台发布配置 🌐
 
 #### 🎊 重大生态扩展：全 VSCode 生态系统支持
 **从单一平台到双平台发布，扩展用户覆盖面至全生态**
@@ -568,7 +568,7 @@ npx @vscode/vsce package
 
 ## 🏆 项目里程碑
 
-### v1.0.3+ - 双平台发布配置里程碑 🌐
+### v1.0.4 - 双平台发布配置里程碑 🌐
 - **🌍 生态扩展**: 从 VSCode 扩展到全 VSCode 生态系统的覆盖
 - **🚀 发布革命**: 建立了双平台自动发布的完整解决方案
 - **🛠️ 运维工具**: 完整的监控、管理、维护工具链
@@ -613,7 +613,7 @@ npx @vscode/vsce package
 | **代码行数** | ~4,000+ 行 TypeScript (v1.0.3新增500行) |
 | **测试覆盖率** | 41.7% (持续提升中) |
 | **CI/CD 状态** | ✅ 完整自动化 |
-| **发布版本** | v1.0.3 (已发布) |
+| **发布版本** | v1.0.4 (已发布) |
 | **支持平台** | Windows, macOS, Linux |
 | **Marketplace** | ✅ 已上线 |
 | **测试验证** | ✅ 生产环境验证 + 企业级项目验证 + 用户反馈验证 |
