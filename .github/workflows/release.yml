@@ -75,6 +75,8 @@ jobs:
   publish-vscode:
     needs: build
     runs-on: ubuntu-latest
+    outputs:
+      publish_status: ${{ steps.vscode-publish.outputs.status }}
     steps:
       - name: Download VSIX artifact
         uses: actions/download-artifact@v4
@@ -89,27 +91,41 @@ jobs:
           # 检查是否有发布令牌
           if [ -z "$VSCE_PAT" ]; then
             echo "⚠️ VSCE_PAT 未设置，跳过 VSCode Marketplace 发布"
+            echo "status=skipped" >> $GITHUB_OUTPUT
             exit 0
           fi
           
           echo "🚀 发布到 VSCode Marketplace..."
-          npx @vscode/vsce publish --packagePath ${{ needs.build.outputs.package_name }}
-          echo "✅ VSCode Marketplace 发布成功"
+          if npx @vscode/vsce publish --packagePath ${{ needs.build.outputs.package_name }}; then
+            echo "✅ VSCode Marketplace 发布成功"
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ VSCode Marketplace 发布失败"
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
         continue-on-error: true
       
       - name: Report VSCode publish result
         if: always()
         run: |
-          if [ "${{ steps.vscode-publish.outcome }}" == "success" ]; then
+          PUBLISH_STATUS="${{ steps.vscode-publish.outputs.status }}"
+          STEP_OUTCOME="${{ steps.vscode-publish.outcome }}"
+          
+          if [ "$PUBLISH_STATUS" == "success" ]; then
             echo "✅ VSCode Marketplace 发布：成功"
+          elif [ "$PUBLISH_STATUS" == "skipped" ]; then
+            echo "⏭️ VSCode Marketplace 发布：跳过 (未设置 VSCE_PAT)"
           else
-            echo "❌ VSCode Marketplace 发布：失败 (状态: ${{ steps.vscode-publish.outcome }})"
+            echo "❌ VSCode Marketplace 发布：失败 (步骤状态: $STEP_OUTCOME)"
           fi
 
   # 📦 OpenVSX Registry 发布（并行任务2）
   publish-openvsx:
     needs: build
     runs-on: ubuntu-latest
+    outputs:
+      publish_status: ${{ steps.openvsx-publish.outputs.status }}
     steps:
       - name: Download VSIX artifact
         uses: actions/download-artifact@v4
@@ -124,27 +140,41 @@ jobs:
           # 检查是否有发布令牌
           if [ -z "$OVSX_PAT" ]; then
             echo "⚠️ OVSX_PAT 未设置，跳过 OpenVSX Registry 发布"
+            echo "status=skipped" >> $GITHUB_OUTPUT
             exit 0
           fi
           
           echo "🚀 发布到 OpenVSX Registry..."
-          npx ovsx publish ${{ needs.build.outputs.package_name }} --pat $OVSX_PAT
-          echo "✅ OpenVSX Registry 发布成功"
+          if npx ovsx publish ${{ needs.build.outputs.package_name }} --pat $OVSX_PAT; then
+            echo "✅ OpenVSX Registry 发布成功"
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ OpenVSX Registry 发布失败"
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
         continue-on-error: true
       
       - name: Report OpenVSX publish result
         if: always()
         run: |
-          if [ "${{ steps.openvsx-publish.outcome }}" == "success" ]; then
+          PUBLISH_STATUS="${{ steps.openvsx-publish.outputs.status }}"
+          STEP_OUTCOME="${{ steps.openvsx-publish.outcome }}"
+          
+          if [ "$PUBLISH_STATUS" == "success" ]; then
             echo "✅ OpenVSX Registry 发布：成功"
+          elif [ "$PUBLISH_STATUS" == "skipped" ]; then
+            echo "⏭️ OpenVSX Registry 发布：跳过 (未设置 OVSX_PAT)"
           else
-            echo "❌ OpenVSX Registry 发布：失败 (状态: ${{ steps.openvsx-publish.outcome }})"
+            echo "❌ OpenVSX Registry 发布：失败 (步骤状态: $STEP_OUTCOME)"
           fi
 
   # 📎 GitHub Release 上传（并行任务3）
   upload-github-release:
     needs: build
     runs-on: ubuntu-latest
+    outputs:
+      upload_status: ${{ steps.github-upload.outputs.status }}
     permissions:
       contents: write  # 允许上传文件到 Release
     steps:
@@ -174,17 +204,74 @@ jobs:
               echo "🔄 Release ${TAG_NAME} 已存在，上传文件..."
               gh release upload "${TAG_NAME}" "${PACKAGE_NAME}" --clobber
             else
-                            echo "🆕 创建新的 Release ${TAG_NAME}..."
+              echo "🆕 创建新的 Release ${TAG_NAME}..."
               
-              # 获取 Tag annotation 作为 Release Notes
-              TAG_MESSAGE=$(git tag -l --format='%(contents)' "${TAG_NAME}" 2>/dev/null || echo "")
+              # 获取 Tag annotation 作为 Release Notes（使用更可靠的方法）
+              echo "🔍 获取 Tag ${TAG_NAME} 的 annotation..."
               
-              if [ -n "$TAG_MESSAGE" ] && [ "$TAG_MESSAGE" != "" ]; then
+              # 方法1: 使用 git show 获取 tag annotation
+              TAG_MESSAGE=$(git show "${TAG_NAME}" --format='%B' --no-patch 2>/dev/null || echo "")
+              
+              # 如果方法1失败，尝试方法2: 使用 git tag -l --format
+              if [ -z "$TAG_MESSAGE" ] || [ "$TAG_MESSAGE" = "$TAG_NAME" ]; then
+                echo "🔄 尝试备用方法获取 tag annotation..."
+                TAG_MESSAGE=$(git tag -l --format='%(contents)' "${TAG_NAME}" 2>/dev/null || echo "")
+              fi
+              
+              # 如果方法2也失败，尝试方法3: 使用 git cat-file
+              if [ -z "$TAG_MESSAGE" ] || [ "$TAG_MESSAGE" = "$TAG_NAME" ]; then
+                echo "🔄 尝试第三种方法获取 tag annotation..."
+                TAG_OBJECT=$(git rev-parse "${TAG_NAME}^{}" 2>/dev/null || echo "")
+                if [ -n "$TAG_OBJECT" ]; then
+                  TAG_MESSAGE=$(git cat-file -p "${TAG_NAME}" 2>/dev/null | sed '1,/^$/d' || echo "")
+                fi
+              fi
+              
+              # 检查是否成功获取到有意义的内容
+              if [ -n "$TAG_MESSAGE" ] && [ "$TAG_MESSAGE" != "" ] && [ "$TAG_MESSAGE" != "$TAG_NAME" ]; then
+                echo "📝 成功获取 Tag annotation，长度: ${#TAG_MESSAGE} 字符"
+                echo "📄 Release Notes 预览 (前100字符):"
+                echo "$TAG_MESSAGE" | head -c 100
+                echo ""
+                echo "..."
+                
+                # 将 tag message 保存到临时文件，保持格式
+                NOTES_FILE="/tmp/release_notes.md"
+                echo "$TAG_MESSAGE" > "$NOTES_FILE"
+                
                 echo "📝 使用 Tag annotation 作为 Release Notes"
-                gh release create "${TAG_NAME}" "${PACKAGE_NAME}" --title "API Navigator ${TAG_NAME}" --notes "$TAG_MESSAGE"
+                gh release create "${TAG_NAME}" "${PACKAGE_NAME}" \
+                  --title "API Navigator ${TAG_NAME}" \
+                  --notes-file "$NOTES_FILE"
               else
-                echo "📝 使用默认 Release Notes"
-                gh release create "${TAG_NAME}" "${PACKAGE_NAME}" --title "API Navigator ${TAG_NAME}" --notes "🚀 API Navigator ${TAG_NAME} 自动发布。VSCode Marketplace 和 OpenVSX Registry 同步发布中，请访问 GitHub 仓库查看详细信息。"
+                echo "⚠️ 无法获取有效的 Tag annotation，使用默认 Release Notes"
+                
+                # 创建默认的 Release Notes
+                DEFAULT_NOTES_FILE="/tmp/default_release_notes.md"
+                {
+                  echo "🚀 API Navigator ${TAG_NAME} 自动发布"
+                  echo ""
+                  echo "这是一个自动化发布版本。"
+                  echo ""
+                  echo "## 📦 安装方式"
+                  echo ""
+                  echo "1. **VSCode Marketplace**: 搜索 \"API Navigator\" 或访问扩展商店"
+                  echo "2. **OpenVSX Registry**: 适用于 VSCodium 和其他兼容编辑器"
+                  echo "3. **GitHub Release**: 下载 VSIX 文件手动安装"
+                  echo ""
+                  echo "## 🔗 相关链接"
+                  echo ""
+                  echo "- 📝 完整更新日志: [README.md](https://github.com/xkcoding/API-Navigator/blob/main/README.md)"
+                  echo "- 🐛 问题反馈: [Issues](https://github.com/xkcoding/API-Navigator/issues)"
+                  echo "- 📖 使用文档: [GitHub 仓库](https://github.com/xkcoding/API-Navigator)"
+                  echo ""
+                  echo "---"
+                  echo "*此版本通过 GitHub Actions 自动发布到多个平台*"
+                } > "$DEFAULT_NOTES_FILE"
+                
+                gh release create "${TAG_NAME}" "${PACKAGE_NAME}" \
+                  --title "API Navigator ${TAG_NAME}" \
+                  --notes-file "$DEFAULT_NOTES_FILE"
               fi
             fi
           else
@@ -194,17 +281,27 @@ jobs:
           fi
           
           echo "✅ GitHub Release 处理成功"
+          echo "status=success" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
       
+      - name: Handle GitHub upload failure
+        if: failure() && steps.github-upload.outcome == 'failure'
+        run: |
+          echo "❌ GitHub Release 处理失败"
+          echo "status=failed" >> $GITHUB_OUTPUT
+      
       - name: Report GitHub upload result
         if: always()
         run: |
-          if [ "${{ steps.github-upload.outcome }}" == "success" ]; then
+          UPLOAD_STATUS="${{ steps.github-upload.outputs.status }}"
+          STEP_OUTCOME="${{ steps.github-upload.outcome }}"
+          
+          if [ "$UPLOAD_STATUS" == "success" ]; then
             echo "✅ GitHub Release 上传：成功"
           else
-            echo "❌ GitHub Release 上传：失败 (状态: ${{ steps.github-upload.outcome }})"
+            echo "❌ GitHub Release 上传：失败 (步骤状态: $STEP_OUTCOME)"
           fi
 
   # 📊 发布状态汇总（最终状态报告）
@@ -218,26 +315,70 @@ jobs:
           echo "📋 发布状态汇总报告"
           echo "===================="
           echo "🔧 构建状态: ${{ needs.build.result }}"
-          echo "🚀 VSCode Marketplace: ${{ needs.publish-vscode.result }}"
-          echo "📦 OpenVSX Registry: ${{ needs.publish-openvsx.result }}"
-          echo "📎 GitHub Release: ${{ needs.upload-github-release.result }}"
+          
+          # 获取各平台的详细状态
+          VSCODE_STATUS="${{ needs.publish-vscode.outputs.publish_status }}"
+          OPENVSX_STATUS="${{ needs.publish-openvsx.outputs.publish_status }}"
+          GITHUB_STATUS="${{ needs.upload-github-release.outputs.upload_status }}"
+          
+          # 处理空状态（失败时没有输出）
+          [ -z "$VSCODE_STATUS" ] && VSCODE_STATUS="failed"
+          [ -z "$OPENVSX_STATUS" ] && OPENVSX_STATUS="failed"
+          [ -z "$GITHUB_STATUS" ] && GITHUB_STATUS="failed"
+          
+          # 显示各平台状态
+          echo "🚀 VSCode Marketplace: $VSCODE_STATUS"
+          echo "📦 OpenVSX Registry: $OPENVSX_STATUS"
+          echo "📎 GitHub Release: $GITHUB_STATUS"
           echo "===================="
           
-          # 统计成功的发布平台数量
+          # 统计各种状态的数量
           SUCCESS_COUNT=0
+          SKIPPED_COUNT=0
+          FAILED_COUNT=0
           TOTAL_COUNT=3
           
-          [ "${{ needs.publish-vscode.result }}" == "success" ] && SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-          [ "${{ needs.publish-openvsx.result }}" == "success" ] && SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-          [ "${{ needs.upload-github-release.result }}" == "success" ] && SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+          # VSCode Marketplace
+          case "$VSCODE_STATUS" in
+            "success") SUCCESS_COUNT=$((SUCCESS_COUNT + 1)) ;;
+            "skipped") SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) ;;
+            *) FAILED_COUNT=$((FAILED_COUNT + 1)) ;;
+          esac
           
-          echo "📊 发布成功率: ${SUCCESS_COUNT}/${TOTAL_COUNT} 平台"
+          # OpenVSX Registry
+          case "$OPENVSX_STATUS" in
+            "success") SUCCESS_COUNT=$((SUCCESS_COUNT + 1)) ;;
+            "skipped") SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) ;;
+            *) FAILED_COUNT=$((FAILED_COUNT + 1)) ;;
+          esac
           
+          # GitHub Release
+          case "$GITHUB_STATUS" in
+            "success") SUCCESS_COUNT=$((SUCCESS_COUNT + 1)) ;;
+            "skipped") SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) ;;
+            *) FAILED_COUNT=$((FAILED_COUNT + 1)) ;;
+          esac
+          
+          # 显示统计结果
+          echo "📊 发布统计:"
+          echo "   ✅ 成功: ${SUCCESS_COUNT} 个平台"
+          echo "   ⏭️ 跳过: ${SKIPPED_COUNT} 个平台"
+          echo "   ❌ 失败: ${FAILED_COUNT} 个平台"
+          
+          # 最终状态判断
           if [ $SUCCESS_COUNT -eq $TOTAL_COUNT ]; then
             echo "🎉 所有平台发布成功！"
           elif [ $SUCCESS_COUNT -gt 0 ]; then
-            echo "⚠️ 部分平台发布成功，请检查失败的平台"
+            if [ $SKIPPED_COUNT -gt 0 ]; then
+              echo "⚠️ 部分平台发布成功，部分平台跳过"
+            else
+              echo "⚠️ 部分平台发布成功，请检查失败的平台"
+            fi
+          elif [ $SKIPPED_COUNT -eq $TOTAL_COUNT ]; then
+            echo "⏭️ 所有平台都跳过了发布"
           else
-            echo "❌ 所有平台发布失败"
-            exit 1
+            echo "❌ 发布过程中出现失败"
+            if [ $FAILED_COUNT -eq $TOTAL_COUNT ]; then
+              exit 1
+            fi
           fi
