@@ -75,7 +75,6 @@ jobs:
   publish-vscode:
     needs: build
     runs-on: ubuntu-latest
-    continue-on-error: true  # 容错机制：此任务失败不影响整个工作流
     steps:
       - name: Download VSIX artifact
         uses: actions/download-artifact@v4
@@ -83,6 +82,7 @@ jobs:
           name: extension-package
       
       - name: Publish to VSCode Marketplace
+        id: vscode-publish
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
@@ -100,17 +100,16 @@ jobs:
       - name: Report VSCode publish result
         if: always()
         run: |
-          if [ ${{ job.status }} == 'success' ]; then
+          if [ "${{ steps.vscode-publish.outcome }}" == "success" ]; then
             echo "✅ VSCode Marketplace 发布：成功"
           else
-            echo "❌ VSCode Marketplace 发布：失败"
+            echo "❌ VSCode Marketplace 发布：失败 (状态: ${{ steps.vscode-publish.outcome }})"
           fi
 
   # 📦 OpenVSX Registry 发布（并行任务2）
   publish-openvsx:
     needs: build
     runs-on: ubuntu-latest
-    continue-on-error: true  # 容错机制：此任务失败不影响整个工作流
     steps:
       - name: Download VSIX artifact
         uses: actions/download-artifact@v4
@@ -118,6 +117,7 @@ jobs:
           name: extension-package
       
       - name: Publish to OpenVSX Registry
+        id: openvsx-publish
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
@@ -135,17 +135,16 @@ jobs:
       - name: Report OpenVSX publish result
         if: always()
         run: |
-          if [ ${{ job.status }} == 'success' ]; then
+          if [ "${{ steps.openvsx-publish.outcome }}" == "success" ]; then
             echo "✅ OpenVSX Registry 发布：成功"
           else
-            echo "❌ OpenVSX Registry 发布：失败"
+            echo "❌ OpenVSX Registry 发布：失败 (状态: ${{ steps.openvsx-publish.outcome }})"
           fi
 
   # 📎 GitHub Release 上传（并行任务3）
   upload-github-release:
     needs: build
     runs-on: ubuntu-latest
-    continue-on-error: true  # 容错机制：此任务失败不影响整个工作流
     permissions:
       contents: write  # 允许上传文件到 Release
     steps:
@@ -160,6 +159,7 @@ jobs:
           name: extension-package
       
       - name: Upload VSIX to GitHub Release
+        id: github-upload
         run: |
           echo "🚀 处理 GitHub Release..."
           TAG_NAME="${{ needs.build.outputs.tag_name }}"
@@ -201,10 +201,10 @@ jobs:
       - name: Report GitHub upload result
         if: always()
         run: |
-          if [ ${{ job.status }} == 'success' ]; then
+          if [ "${{ steps.github-upload.outcome }}" == "success" ]; then
             echo "✅ GitHub Release 上传：成功"
           else
-            echo "❌ GitHub Release 上传：失败"
+            echo "❌ GitHub Release 上传：失败 (状态: ${{ steps.github-upload.outcome }})"
           fi
 
   # 📊 发布状态汇总（最终状态报告）
