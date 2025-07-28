@@ -206,25 +206,29 @@ jobs:
             else
               echo "🆕 创建新的 Release ${TAG_NAME}..."
               
-              # 获取 Tag annotation 作为 Release Notes（使用更可靠的方法）
+              # 获取 Tag annotation 作为 Release Notes（修复逻辑）
               echo "🔍 获取 Tag ${TAG_NAME} 的 annotation..."
               
-              # 方法1: 使用 git show 获取 tag annotation
-              TAG_MESSAGE=$(git show "${TAG_NAME}" --format='%B' --no-patch 2>/dev/null || echo "")
+              # 首先检查这是否是一个 annotated tag
+              TAG_TYPE=$(git cat-file -t "${TAG_NAME}" 2>/dev/null || echo "")
+              echo "🏷️ Tag ${TAG_NAME} 类型: ${TAG_TYPE}"
               
-              # 如果方法1失败，尝试方法2: 使用 git tag -l --format
-              if [ -z "$TAG_MESSAGE" ] || [ "$TAG_MESSAGE" = "$TAG_NAME" ]; then
-                echo "🔄 尝试备用方法获取 tag annotation..."
+              TAG_MESSAGE=""
+              
+              if [ "$TAG_TYPE" = "tag" ]; then
+                # 这是一个 annotated tag，获取 tag annotation
+                echo "📝 检测到 Annotated Tag，获取 tag message..."
                 TAG_MESSAGE=$(git tag -l --format='%(contents)' "${TAG_NAME}" 2>/dev/null || echo "")
-              fi
-              
-              # 如果方法2也失败，尝试方法3: 使用 git cat-file
-              if [ -z "$TAG_MESSAGE" ] || [ "$TAG_MESSAGE" = "$TAG_NAME" ]; then
-                echo "🔄 尝试第三种方法获取 tag annotation..."
-                TAG_OBJECT=$(git rev-parse "${TAG_NAME}^{}" 2>/dev/null || echo "")
-                if [ -n "$TAG_OBJECT" ]; then
+                
+                # 如果上面的方法失败，尝试使用 git cat-file
+                if [ -z "$TAG_MESSAGE" ]; then
+                  echo "🔄 尝试备用方法获取 annotated tag message..."
                   TAG_MESSAGE=$(git cat-file -p "${TAG_NAME}" 2>/dev/null | sed '1,/^$/d' || echo "")
                 fi
+              else
+                # 这是一个 lightweight tag，没有独立的 tag message
+                echo "🏷️ 检测到 Lightweight Tag，没有独立的 tag annotation"
+                TAG_MESSAGE=""
               fi
               
               # 检查是否成功获取到有意义的内容
@@ -244,14 +248,23 @@ jobs:
                   --title "API Navigator ${TAG_NAME}" \
                   --notes-file "$NOTES_FILE"
               else
-                echo "⚠️ 无法获取有效的 Tag annotation，使用默认 Release Notes"
+                # 根据 tag 类型显示不同的提示信息
+                if [ "$TAG_TYPE" = "tag" ]; then
+                  echo "⚠️ 无法获取 Annotated Tag 的 annotation 内容，使用默认 Release Notes"
+                else
+                  echo "ℹ️ Lightweight Tag 没有 annotation 信息，使用默认 Release Notes"
+                fi
                 
                 # 创建默认的 Release Notes
                 DEFAULT_NOTES_FILE="/tmp/default_release_notes.md"
                 {
                   echo "🚀 API Navigator ${TAG_NAME} 自动发布"
                   echo ""
-                  echo "这是一个自动化发布版本。"
+                  if [ "$TAG_TYPE" = "tag" ]; then
+                    echo "📝 **说明**: 此版本为 Annotated Tag，但无法获取 tag annotation 内容。"
+                  else
+                    echo "📝 **说明**: 此版本为 Lightweight Tag，没有独立的发布说明。"
+                  fi
                   echo ""
                   echo "## 📦 安装方式"
                   echo ""
