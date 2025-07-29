@@ -220,7 +220,6 @@ codium --install-extension xkcoding.xkcoding-api-navigator
 ### 📋 待开发  
 
 - [ ] **缓存云同步**: 团队缓存共享和同步机制
-- [ ] **高级搜索**: 按 HTTP 方法、路径模式过滤
 - [ ] **API 文档**: 集成 Swagger/OpenAPI 文档
 - [ ] **测试集成**: API 测试工具集成
 - [ ] **多框架支持**: Micronaut、JAX-RS 支持
