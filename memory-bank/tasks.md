@@ -46,6 +46,83 @@
 - [x] IMPLEMENT阶段 - 分四个子功能实施 ✅ **已完成**
 - [x] REFLECT阶段 - 待开始 ✅ **准备中**
 
+---
+
+## 📋 Level 1任务：RequestMapping method解析BUG修复 ✅
+
+### 任务描述
+**目标**: 修复JavaASTParser中RequestMapping注解的method参数解析错误  
+**问题**: `@RequestMapping(value = "/path", method = RequestMethod.POST)` 被错误识别为GET类型
+
+### 复杂度
+**Level**: 1 - Quick Bug Fix  
+**Type**: 核心解析逻辑错误修复 ✅  
+**流程**: VAN模式直接处理 ✅
+
+### 技术问题分析
+- ❌ **问题根源**: `extractHttpMethod`方法对`RequestMapping`注解固定返回'GET'
+- ❌ **遗留TODO**: 代码中有"TODO: 处理method属性"注释
+- ✅ **解析逻辑**: `parseElementValuePairs`已正确解析，但未被`extractHttpMethod`使用
+
+### 修复实施 ✅
+1. **修复extractHttpMethod方法**: 检查`annotation.attributes.method`属性
+2. **增强parseElementValuePairs**: 支持`RequestMethod.POST`枚举引用解析  
+3. **完善HTTP方法识别**: 支持POST/GET/PUT/DELETE/PATCH全系列
+4. **添加测试用例**: 验证所有HTTP方法的正确解析
+
+### 技术实现
+- 修改`extractHttpMethod`: 添加`annotation.attributes?.method`检查
+- 增强AST遍历: 支持`ElementValueContext`节点的枚举引用解析
+- 优化method解析: 使用`includes()`检查支持多种格式
+
+### 验证结果 ✅
+- ✅ 所有现有测试通过
+- ✅ 新增POST method测试通过
+- ✅ 支持PUT/DELETE方法解析
+- ✅ 用户案例验证成功
+
+---
+
+## 📋 Level 1任务：版本更新到v1.0.6 + README更新 ✅
+
+### 任务描述
+**目标**: 更新项目版本号到v1.0.6并更新README内容，记录RequestMapping解析修复  
+**时间**: 2025-07-29 17:17
+
+### 复杂度
+**Level**: 1 - 简单版本更新  
+**Type**: 版本发布准备 ✅  
+**流程**: VAN模式直接处理 ✅
+
+### 更新内容 ✅
+1. **package.json**: 版本号从1.0.5更新到1.0.6
+2. **README.md主要功能**: 新增"注解解析增强 v1.0.6"特性描述
+3. **README.md项目里程碑**: 添加"v1.0.6 - 注解解析精准化里程碑"
+4. **README.md项目统计**: 更新发布版本和代码行数描述
+
+### 版本亮点
+- 🐛 **核心修复**: RequestMapping method参数解析错误
+- ✅ **全方法支持**: 完整支持POST/GET/PUT/DELETE/PATCH
+- 🧪 **测试增强**: 新增专门测试用例防止回归
+- 🛡️ **质量提升**: 清理TODO注释，提升代码完整性
+
+### 状态
+- [x] package.json版本号更新 ✅
+- [x] README主要功能部分更新 ✅  
+- [x] README项目里程碑新增 ✅
+- [x] README项目统计更新 ✅
+- [x] Memory Bank记录更新 ✅
+- [x] REFLECT阶段完成 ✅
+- [x] ARCHIVE阶段完成 ✅
+
+## 📦 归档状态
+- **归档日期**: 2025-07-29 17:19
+- **归档文档**: memory-bank/archive/archive-v1.0.6-comprehensive-update_20250729.md
+- **反思文档**: 
+  - memory-bank/reflection/reflection-v1.0.5-multi-feature-enhancement.md
+  - memory-bank/reflection/reflection-requestmapping-fix-version-update.md
+- **任务状态**: 🎊 ALL COMPLETED & ARCHIVED
+
 ### 🎊 最终完成状态 (2025-07-29 02:44)
 - **开发时间**: 2025-07-28 20:02 ~ 2025-07-29 02:44
 - **实际工时**: 6-8小时

@@ -232,20 +232,32 @@ export class JavaASTParser {
                     } else if (subNode.constructor.name === 'LiteralContext') {
                         const literal = this.getNodeText(subNode);
                         propertyValue = literal.replace(/['"]/g, '');
+                    } else if (propertyName === 'method') {
+                        // 处理 RequestMethod.POST 这样的枚举引用
+                        const nodeText = this.getNodeText(subNode);
+                        if (nodeText && nodeText.trim() && !propertyValue) { 
+                            // 只在还没有值的时候设置，优先获取完整的枚举引用
+                            propertyValue = nodeText;
+                        }
                     }
                 });
                 
                 if (propertyName && propertyValue) {
                     if (propertyName === 'value' || propertyName === 'path') {
                         attributes.value = propertyValue;
-                    } else if (propertyName === 'method' && propertyValue.includes('GET')) {
-                        attributes.method = 'GET';
-                    } else if (propertyName === 'method' && propertyValue.includes('POST')) {
-                        attributes.method = 'POST';
-                    } else if (propertyName === 'method' && propertyValue.includes('PUT')) {
-                        attributes.method = 'PUT';
-                    } else if (propertyName === 'method' && propertyValue.includes('DELETE')) {
-                        attributes.method = 'DELETE';
+                    } else if (propertyName === 'method') {
+                        // 解析HTTP方法，支持RequestMethod.POST 或 "POST" 格式
+                        if (propertyValue.includes('POST')) {
+                            attributes.method = 'POST';
+                        } else if (propertyValue.includes('GET')) {
+                            attributes.method = 'GET';
+                        } else if (propertyValue.includes('PUT')) {
+                            attributes.method = 'PUT';
+                        } else if (propertyValue.includes('DELETE')) {
+                            attributes.method = 'DELETE';
+                        } else if (propertyValue.includes('PATCH')) {
+                            attributes.method = 'PATCH';
+                        }
                     }
                 }
             }
@@ -544,7 +556,10 @@ export class JavaASTParser {
             case 'PatchMapping':
                 return 'PATCH';
             case 'RequestMapping':
-                // TODO: 处理method属性
+                // 处理method属性，如果没有指定则默认为GET
+                if (annotation.attributes?.method) {
+                    return annotation.attributes.method as HttpMethod;
+                }
                 return 'GET'; // 默认值
             default:
                 return 'GET';

@@ -166,4 +166,53 @@ public class ApiController {
       expect(mappingAnnotations).toContain('RequestMapping');
     });
   });
+
+  describe('RequestMapping method 解析测试', () => {
+    it('应该正确解析 RequestMapping 的 POST method', async () => {
+      const javaCode = `
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api")
+public class TestController {
+    
+    @RequestMapping(value = "/startRegressTriggerWithBusiness", method = RequestMethod.POST)
+    public ResponseEntity<String> startRegressTrigger(@RequestBody BusinessRequest request) {
+        return ResponseEntity.ok("success");
+    }
+    
+    @RequestMapping(value = "/updateUser", method = RequestMethod.PUT)
+    public ResponseEntity<String> updateUser(@RequestBody UserRequest request) {
+        return ResponseEntity.ok("updated");
+    }
+    
+    @RequestMapping(value = "/deleteUser/{id}", method = RequestMethod.DELETE)
+    public ResponseEntity<String> deleteUser(@PathVariable Long id) {
+        return ResponseEntity.ok("deleted");
+    }
+}`;
+
+      const result = await JavaASTParser.parseFile('/test/TestController.java', javaCode);
+
+      expect(result.length).toBe(3);
+      
+      // 验证POST方法
+      const postEndpoint = result.find(r => r.path.includes('startRegressTriggerWithBusiness'));
+      expect(postEndpoint).toBeDefined();
+      expect(postEndpoint!.method).toBe('POST');
+      expect(postEndpoint!.path).toBe('/api/startRegressTriggerWithBusiness');
+      
+      // 验证PUT方法
+      const putEndpoint = result.find(r => r.path.includes('updateUser'));
+      expect(putEndpoint).toBeDefined();
+      expect(putEndpoint!.method).toBe('PUT');
+      expect(putEndpoint!.path).toBe('/api/updateUser');
+      
+      // 验证DELETE方法
+      const deleteEndpoint = result.find(r => r.path.includes('deleteUser'));
+      expect(deleteEndpoint).toBeDefined();
+      expect(deleteEndpoint!.method).toBe('DELETE');
+      expect(deleteEndpoint!.path).toBe('/api/deleteUser/{id}');
+    });
+  });
 }); 
